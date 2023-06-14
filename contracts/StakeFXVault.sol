@@ -38,6 +38,7 @@ contract StakeFXVault is
     
     VaultInfo public vaultInfo;
     mapping(uint256 => ValInfo) public valInfo;
+    mapping(string => bool) public addedValidator;
 
     struct VaultInfo {
         uint256 stakeId;
@@ -155,93 +156,97 @@ contract StakeFXVault is
 
     /**************************************** Internal and Private Functions ****************************************/
 
-    function _stake2(uint256 amount) internal {
-        VaultInfo memory vault = vaultInfo;
-        uint256 totalAllocPoint = vault.totalAllocPoint;
-        uint256 newTotalAllocPoint = totalAllocPoint;
-        uint256 totalReturnReward;
-        uint256 index = vault.stakeId;
-        if (amount <= STAKE_FX_TARGET) {
-            uint256 numValidators = _calculateNumberofValidators(amount);
-            uint256 amountPerValidator = amount / numValidators;
+    // function _stake2(uint256 amount) internal {
+    //     VaultInfo memory vault = vaultInfo;
+    //     uint256 totalAllocPoint = vault.totalAllocPoint;
+    //     uint256 newTotalAllocPoint = totalAllocPoint;
+    //     uint256 totalReturnReward;
+    //     uint256 index = vault.stakeId;
+    //     if (amount <= STAKE_FX_TARGET) {
+    //         uint256 numValidators = _calculateNumberofValidators(amount);
+    //         uint256 amountPerValidator = amount / numValidators;
 
-            while (amount != 0) {
-                ValInfo memory val = valInfo[index];
-                uint256 allocPoint = val.allocPoint;
+    //         while (amount != 0) {
+    //             ValInfo memory val = valInfo[index];
+    //             uint256 allocPoint = val.allocPoint;
 
-                (, uint256 delegationAmount) = _delegation(val.validator, address(this));
-                uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
+    //             (, uint256 delegationAmount) = _delegation(val.validator, address(this));
+    //             uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
 
-                if (delegationAmount >= maxValSize) {
-                    index = (index + 1) % vault.length;
-                    continue;
-                }
+    //             if (delegationAmount >= maxValSize) {
+    //                 index = (index + 1) % vault.length;
+    //                 continue;
+    //             }
 
-                uint256 delegateAmount = 0;
+    //             uint256 delegateAmount = 0;
 
-                if (amount < amountPerValidator) {
-                    delegateAmount = amount;
-                } else {
-                    delegateAmount = amountPerValidator;
-                }
+    //             if (amount < amountPerValidator) {
+    //                 delegateAmount = amount;
+    //             } else {
+    //                 delegateAmount = amountPerValidator;
+    //             }
 
-                (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
-                totalReturnReward += returnReward;
-                amount -= delegateAmount;
-                index = (index + 1) % vault.length;
-            }
-        } else {
-            while (amount != 0) {
-                ValInfo memory val = valInfo[index];
-                uint256 allocPoint = val.allocPoint;
+    //             (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
+    //             totalReturnReward += returnReward;
+    //             amount -= delegateAmount;
+    //             index = (index + 1) % vault.length;
+    //         }
+    //     } else {
+    //         while (amount != 0) {
+    //             ValInfo memory val = valInfo[index];
+    //             uint256 allocPoint = val.allocPoint;
 
-                (, uint256 delegationAmount) = _delegation(val.validator, address(this));
-                uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
-                index = (index + 1) % vault.length;
+    //             (, uint256 delegationAmount) = _delegation(val.validator, address(this));
+    //             uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
+    //             index = (index + 1) % vault.length;
                 
-                // Skip validators that has reach max of its allocation FX delegation
-                if (delegationAmount >= maxValSize) {
-                    newTotalAllocPoint -= allocPoint;                
-                    continue;
-                }
+    //             // Skip validators that has reach max of its allocation FX delegation
+    //             if (delegationAmount >= maxValSize) {
+    //                 newTotalAllocPoint -= allocPoint;                
+    //                 continue;
+    //             }
                 
-                // If newTotalAllocPoint equal to 0, it means last validator in this while loop has reach max of its FX allocation, delegate remaining FX to this loop validator.
-                // If remainingAmount less than minimum compound target, delegate remaining FX to this round validator to save gas.
-                uint256 delegateAmount;
-                if(newTotalAllocPoint == 0) {
-                    delegateAmount = amount;
-                } else {
-                    delegateAmount = amount * allocPoint / newTotalAllocPoint;
-                    if (amount - delegateAmount <= MIN_COMPOUND_AMOUNT) {
-                        delegateAmount = amount;
-                    }
-                    newTotalAllocPoint -= allocPoint;
-                }
+    //             // If newTotalAllocPoint equal to 0, it means last validator in this while loop has reach max of its FX allocation, delegate remaining FX to this loop validator.
+    //             // If remainingAmount less than minimum compound target, delegate remaining FX to this round validator to save gas.
+    //             uint256 delegateAmount;
+    //             if(newTotalAllocPoint == 0) {
+    //                 delegateAmount = amount;
+    //             } else {
+    //                 delegateAmount = amount * allocPoint / newTotalAllocPoint;
+    //                 if (amount - delegateAmount <= MIN_COMPOUND_AMOUNT) {
+    //                     delegateAmount = amount;
+    //                 }
+    //                 newTotalAllocPoint -= allocPoint;
+    //             }
                 
-                // Skip validators that has 0 allocPoint
-                if (delegateAmount == 0) {
-                    continue;
-                }
+    //             // Skip validators that has 0 allocPoint
+    //             if (delegateAmount == 0) {
+    //                 continue;
+    //             }
 
-                uint256 returnReward;
+    //             uint256 returnReward;
                 
-                (, returnReward) = _delegate(val.validator, delegateAmount);
-                totalReturnReward += returnReward;
-                amount -= delegateAmount;
-            }
-        }
+    //             (, returnReward) = _delegate(val.validator, delegateAmount);
+    //             totalReturnReward += returnReward;
+    //             amount -= delegateAmount;
+    //         }
+    //     }
 
-        vaultInfo.stakeId = index;
-        pendingFxReward += totalReturnReward;
-    }
+    //     vaultInfo.stakeId = index;
+    //     pendingFxReward += totalReturnReward;
+    // }
 
     function _stake(uint256 amount) internal {
         VaultInfo memory vault = vaultInfo;
         uint256 totalAllocPoint = vault.totalAllocPoint;
         uint256 index = vault.stakeId;
         uint256 vaultLength = vault.length;
-
         uint256 totalReturnReward;
+
+        // After execute removeValidator, stakeId may equal or greater than vaultLength
+        if (index >= vaultLength) {
+            index = 0;
+        }        
 
         if (amount <= STAKE_FX_TARGET) {
             uint256 numValidators = _calculateNumberofValidators(amount);
@@ -321,11 +326,15 @@ contract StakeFXVault is
 
         uint256 remainingAmount = amount;
         uint256 totalReward;        
-        
         uint256 returnUndelegateAmount;
         uint256 returnReward;
         uint256 endTime;
         
+        // After execute removeValidator, stakeId may equal or greater than vaultLength
+        if (index >= vaultLength) {
+            index = 0;
+        }   
+
         if (amount >= UNSTAKE_FX_TARGET) {
             uint256 halfOfUndelegateAmount = amount / 2; 
             (returnUndelegateAmount, returnReward, endTime) = _toUndelegate(index, halfOfUndelegateAmount);
@@ -333,7 +342,6 @@ contract StakeFXVault is
             remainingAmount -= returnUndelegateAmount;
             index = (index + 1) % vaultLength;
             totalReward += returnReward;
-            endTime = endTime;
         }
 
         while (remainingAmount != 0) {
@@ -342,7 +350,6 @@ contract StakeFXVault is
             remainingAmount -= returnUndelegateAmount;
             index = (index + 1) % vaultLength;
             totalReward += returnReward;
-            endTime = endTime;
         }
 
         IVestedFX(vestedFX).lockWithEndTime(
@@ -468,11 +475,14 @@ contract StakeFXVault is
         string memory _validator,
         uint256 _allocPoint
     ) external onlyRole(GOVERNOR_ROLE) {
+        require(addedValidator[_validator] == false, "addedVal");
         valInfo[vaultInfo.length].validator = _validator;
         valInfo[vaultInfo.length].allocPoint = _allocPoint;
-        vaultInfo.length++;
 
+        vaultInfo.length++;
         vaultInfo.totalAllocPoint += _allocPoint;
+
+        addedValidator[_validator]=true;
 
         emit ValidatorAdded(_validator, _allocPoint);
     }
