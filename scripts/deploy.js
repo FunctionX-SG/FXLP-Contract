@@ -40,7 +40,7 @@ async function main() {
     await stakeFXVault.deployed();
 
     await stakeFXVault.updateConfigs(tokens("1"),tokens("10000"),tokens("30"),tokens("30"));
-    await stakeFXVault.updateFees("100","50");
+    await stakeFXVault.updateFees("100","50","50");
     
     await stakeFXVault.addValidator("fxvaloper1t67ryvnqmnud5g3vpmck00l3umelwkz7huh0s3", "1000")
     await stakeFXVault.addValidator("fxvaloper1etzrlsszsm0jaj4dp5l25vk3p4w0x4ntl64hlw", "2000")

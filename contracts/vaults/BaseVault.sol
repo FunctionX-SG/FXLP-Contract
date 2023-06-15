@@ -8,12 +8,10 @@ import {IERC20MetadataUpgradeable, IERC20Upgradeable} from "@openzeppelin/contra
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 
-import {IFXDelegateCmpoundStrategy} from "../interfaces/IFXDelegateCmpoundStrategy.sol";
 import {Governable} from "../common/Governable.sol";
 
 abstract contract BaseVault is Governable, PausableUpgradeable, ERC4626Upgradeable {
     using MathUpgradeable for uint256;
-    IFXDelegateCmpoundStrategy public strategy;     // delete  in production
 
     function __BaseVaultInit(address _asset, string memory _name, string memory _symbol, address _owner, address _governor) internal{
         __ERC4626_init(IERC20MetadataUpgradeable(_asset));
