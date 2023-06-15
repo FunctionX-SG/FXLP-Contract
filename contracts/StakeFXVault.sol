@@ -26,7 +26,8 @@ contract StakeFXVault is
     uint256 internal constant BIPS_DIVISOR = 10000;
 
     uint256 public pendingFxReward;             // FX delegation rewards inside the contract pending for compound
-    uint256 public feeOnReward;                 // Compound reward fee
+    uint256 public feeOnReward;                 // Compound reward protocol fee
+    uint256 public feeOnCompounder;             // Compound reward compounder fee
     uint256 public feeOnWithdrawal;             // Withdrawal fee
     address public vestedFX;                    // Contract that stored user's withdrawal info
     address public feeTreasury;                 // Contract that keep compound reward fee
@@ -34,11 +35,11 @@ contract StakeFXVault is
     uint256 private MIN_COMPOUND_AMOUNT;        // Minimum reward amount to compound when stake happen
     uint256 private CAP_STAKE_FX_TARGET;        // Cap amount of FX delegation
     uint256 private STAKE_FX_TARGET;            // Target stake amount to do whole validator list delegate
-    uint256 private UNSTAKE_FX_TARGET;              // Target unstake amount to split undelegate
+    uint256 private UNSTAKE_FX_TARGET;          // Target unstake amount to split undelegate
     
-    VaultInfo public vaultInfo;
+    VaultInfo public vaultInfo;                     // Vault Info
     mapping(uint256 => ValInfo) public valInfo;     // Validator info
-    mapping(string => bool) public addedValidator;
+    mapping(string => bool) public addedValidator;  // True if validator is added
 
     struct VaultInfo {
         uint256 stakeId;
@@ -56,7 +57,7 @@ contract StakeFXVault is
     event Unstake(address indexed user, uint256 amount, uint256 shares);
     event ValidatorUpdated(string val, uint256 newAllocPoint);
     event ValidatorAdded(string val, uint256 newAllocPoint);
-    event Compound(address indexed user, uint256 fees, uint256 compoundAmount);
+    event Compound(address indexed user, uint256 compoundAmount);
     event VestedFXChanged(address newAddress);
     event FeeTreasuryChanged(address newAddress);
 
@@ -88,7 +89,7 @@ contract StakeFXVault is
     }
 
     /**
-     * @notice transfer user delegate share to this contract
+     * @notice user unstake/ request undelegate FX
      * @param amount User's fx-LP receipt tokens
      */
     function unstake(uint256 amount) external {
@@ -108,15 +109,15 @@ contract StakeFXVault is
     }
 
     /**
-     * @notice transfer user delegate share to this contract
+     * @notice transfer user delegation shares to this contract
      * @param val validator address
      * @param amount Amount of user's delegate shares transferred to this contract
      */
     function entrustDelegatedShare(string memory val, uint256 amount) external {
         require(amount > 0, "Entrust: 0 share");
 
-        (uint256 shares, ) = _delegation(val, msg.sender);
-        require(shares >= amount, "Not enough share");
+        (uint256 sharesAmount, ) = _delegation(val, msg.sender);
+        require(sharesAmount >= amount, "Not enough share");
 
         uint256 delegationReward = getTotalDelegationRewards();
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
@@ -130,32 +131,51 @@ contract StakeFXVault is
 
         pendingFxReward += returnRewards;
 
-        uint256 sharesAmount = (fxAmountToTransfer == 0 || supply == 0)
+        uint256 shares = (fxAmountToTransfer == 0 || supply == 0)
                 ? _initialConvertToShares(fxAmountToTransfer, MathUpgradeable.Rounding.Down)
                 : fxAmountToTransfer.mulDiv(supply, totalAsset, MathUpgradeable.Rounding.Down);
 
-        _mint(msg.sender, sharesAmount);
+        _mint(msg.sender, shares);
 
-        emit Stake(msg.sender, fxAmountToTransfer, sharesAmount); 
+        emit Stake(msg.sender, fxAmountToTransfer, shares); 
     }
 
+    /**
+     * @notice compound delegation rewards
+     */
     function compound() public nonReentrant {
         uint256 delegateAmount = _claimReward() + pendingFxReward;
         pendingFxReward = 0;
-        uint256 fees = (delegateAmount * feeOnReward) / BIPS_DIVISOR;
-        delegateAmount -= fees;
 
-        address recipient = payable(feeTreasury);
-        (bool success, ) = recipient.call{value: fees}("");
-        require(success, "Failed to send FX");
-        
+        uint256 feeProtocol = (delegateAmount * feeOnReward) / BIPS_DIVISOR;
+        uint256 feeCompounder = (delegateAmount * feeOnCompounder) / BIPS_DIVISOR;
+
+        delegateAmount = delegateAmount - feeProtocol - feeCompounder;
         _stake(delegateAmount);
 
-        emit Compound(msg.sender, fees, delegateAmount);
+        address treasury = payable(feeTreasury);
+        address user = payable(msg.sender);
+        (bool successTreasury, ) = treasury.call{value: feeProtocol}("");
+        (bool successUser, ) = user.call{value: feeCompounder}("");
+        require(successTreasury && successUser, "Failed to send FX");
+
+        emit Compound(msg.sender, delegateAmount);
+    }
+
+    function sendVestedFX(
+        uint256 safeAmount
+    ) external onlyVestedFX {
+        address recipient = payable(msg.sender);
+        (bool success, ) = recipient.call{value: safeAmount}("");
+        require(success, "Failed to send FX");
     }
 
     /**************************************** Internal and Private Functions ****************************************/
 
+    /**
+    * @dev Helper function to delegate FX amount to validators.
+    * @param  amount  The amount: FX delegate to validators.
+    */
     function _stake(uint256 amount) internal {
         VaultInfo memory vault = vaultInfo;
         uint256 totalAllocPoint = vault.totalAllocPoint;
@@ -316,11 +336,10 @@ contract StakeFXVault is
     // }
 
     
-
-
     /**
-     * @param amount Amount is in FX token
-     */
+    * @dev Helper function to undelegate FX amount from validators.
+    * @param  amount  The amount: FX to unstake from the vault.
+    */
     function _unstake(uint256 amount) internal {
         VaultInfo memory vault = vaultInfo;
         uint256 index = vault.unstakeId;
@@ -364,8 +383,13 @@ contract StakeFXVault is
         pendingFxReward += totalReward;
     }
 
+    /**
+    * @dev Helper function to undelegate FX amount from validators.
+    * @param  index Validator ID in validator list.
+    * @param  remainingAmount Amount to undelegate from validators.
+    */
     function _toUndelegate(uint256 index, uint256 remainingAmount) internal returns(uint256, uint256, uint256) {
-        (uint256 share, uint256 delegationAmount) = _delegation(valInfo[index].validator, address(this));
+        (uint256 sharesAmount, uint256 delegationAmount) = _delegation(valInfo[index].validator, address(this));
 
         uint256 amountToUndelegate;
         uint256 returnReward;
@@ -378,13 +402,16 @@ contract StakeFXVault is
                 amountToUndelegate = delegationAmount;
             }
 
-            uint256 shareToWithdraw = (share * amountToUndelegate) / delegationAmount;
+            uint256 shareToWithdraw = (sharesAmount * amountToUndelegate) / delegationAmount;
             (amountToUndelegate, returnReward, endTime) = _undelegate(valInfo[index].validator, shareToWithdraw);
         }
 
         return (amountToUndelegate, returnReward, endTime);
     }
 
+    /**
+    * @dev Helper function to claim rewards from all validators.
+    */
     function _claimReward() internal returns (uint256) {
         VaultInfo memory vault = vaultInfo;
         uint256 claimedReward = 0;
@@ -403,6 +430,11 @@ contract StakeFXVault is
         return claimedReward;
     }
 
+    /**
+    * @dev Helper function to help to calculate number of validator to delegate based on input amount.
+    * @param delegateAmount Fx Amount to stake.
+    * @return Number of validators to delegate.
+    */
     function _calculateNumberofValidators(
         uint256 delegateAmount
     ) internal view returns (uint256) {
@@ -420,7 +452,10 @@ contract StakeFXVault is
                 : numValidators);
     }
 
-    function getUnderlyingFX() internal view returns (uint256) {
+    /**
+    * @dev Helper function to help to query total FX delegation.
+    */
+    function _getUnderlyingFX() internal view returns (uint256) {
         uint256 totalAmount;
         uint256 valLength = getValLength();
         for (uint256 i; i < valLength; i++) {
@@ -437,25 +472,35 @@ contract StakeFXVault is
         return vaultInfo.length;
     }
 
+    /**
+     * @notice Return delegation share and fx amount
+     */
     function getDelegationInfo(
         uint256 index
-    ) external view returns (string memory, uint256) {
-        return (valInfo[index].validator, valInfo[index].allocPoint);
-    }
-
-    function getValInfo(uint256 i) public view returns (uint256, string memory) {
-        return (valInfo[i].allocPoint, valInfo[i].validator);
+    ) external view returns (uint256, uint256) {
+        (uint256 sharesAmount, uint256 delegationAmount) = _delegation(valInfo[index].validator, address(this));
+        return (sharesAmount, delegationAmount);
     }
 
     /**
-     * @notice Return total asset deposited
-     * @return Amount of asset deposited
+     * @notice Return validator address and allocPoint
+     */
+    function getValInfo(uint256 index) public view returns (uint256, string memory) {
+        return (valInfo[index].allocPoint, valInfo[index].validator);
+    }
+
+    /**
+     * @notice Return total asset(FX) deposited
+     * @return Amount of asset(FX) deposited
      */
     function totalAssets() public view override returns (uint256) {
-        uint256 underlying = getUnderlyingFX();
+        uint256 underlying = _getUnderlyingFX();
         return underlying;
     }
 
+    /**
+     * @notice Return total delegation reward
+     */
     function getTotalDelegationRewards() public view returns (uint256) {
         uint256 totalAmount;
         uint256 valLength = getValLength();
@@ -533,20 +578,14 @@ contract StakeFXVault is
         STAKE_FX_TARGET = newStakeFxTarget;
     }
 
-    function updateFees(uint256 newFeeOnReward, uint256 newFeeOnWithdrawal) external onlyRole(GOVERNOR_ROLE) {
+    function updateFees(uint256 newFeeOnReward, uint256 newFeeOnCompounder, uint256 newFeeOnWithdrawal) external onlyRole(GOVERNOR_ROLE) {
         feeOnReward = newFeeOnReward;
+        feeOnCompounder = newFeeOnCompounder;
         feeOnWithdrawal = newFeeOnWithdrawal;
     }
 
-    function sendVestedFX(
-        uint256 safeAmount
-    ) external onlyVestedFX {
-        address recipient = payable(msg.sender);
-        (bool success, ) = recipient.call{value: safeAmount}("");
-        require(success, "Failed to send FX");
-    }
-
     /**************************************** Only Owner Functions ****************************************/
+
     function updateVestedFX(address newAddress) external onlyRole(OWNER_ROLE) {
         vestedFX = newAddress;
         emit VestedFXChanged(newAddress);
@@ -564,6 +603,15 @@ contract StakeFXVault is
     ) external onlyRole(OWNER_ROLE) {
         require(_recipient != address(0), "Send to zero address");
         IERC20Upgradeable(token).safeTransfer(_recipient, amount);
+    }
+
+    function recoverFx(
+        uint256 safeAmount,
+        address _recipient
+    ) external onlyRole(OWNER_ROLE) {
+        address recipient = payable(_recipient);
+        (bool success, ) = recipient.call{value: safeAmount}("");
+        require(success, "Failed to send FX");
     }
 
     function _authorizeUpgrade(

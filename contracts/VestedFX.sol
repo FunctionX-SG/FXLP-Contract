@@ -9,14 +9,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import {IFXDelegateCmpoundStrategy} from "./interfaces/IFXDelegateCmpoundStrategy.sol";
+import {IStakeFXVault} from "./interfaces/IStakeFXVault.sol";
 
 
 contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     
     using SafeERC20Upgradeable for IERC20Upgradeable;
-    IFXDelegateCmpoundStrategy private stakeFXVault;
-    IFXDelegateCmpoundStrategy private fxFeeTreasury;
+    IStakeFXVault private stakeFXVault;
+    IStakeFXVault private fxFeeTreasury;
 
     struct VestingSchedule {
         uint64 startTime;
@@ -219,7 +219,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
     }
 
     function updateStakeFXVault(address _stakeFXVault) external onlyOwner nonReentrant{
-        stakeFXVault = IFXDelegateCmpoundStrategy(_stakeFXVault);
+        stakeFXVault = IStakeFXVault(_stakeFXVault);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -229,7 +229,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
      *************************************************************/
 
     function initialize(address _stakeFXVault) public initializer {
-        stakeFXVault = IFXDelegateCmpoundStrategy(_stakeFXVault);
+        stakeFXVault = IStakeFXVault(_stakeFXVault);
 
         __Ownable_init();
         __UUPSUpgradeable_init();
