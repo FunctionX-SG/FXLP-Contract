@@ -25,19 +25,19 @@ contract StakeFXVault is
 
     uint256 internal constant BIPS_DIVISOR = 10000;
 
-    uint256 public pendingFxReward;             // FX rewards in the contract
-    uint256 public feeOnReward;
-    uint256 public feeOnWithdrawal;
-    address public vestedFX;
-    address public feeTreasury;
+    uint256 public pendingFxReward;             // FX delegation rewards inside the contract pending for compound
+    uint256 public feeOnReward;                 // Compound reward fee
+    uint256 public feeOnWithdrawal;             // Withdrawal fee
+    address public vestedFX;                    // Contract that stored user's withdrawal info
+    address public feeTreasury;                 // Contract that keep compound reward fee
 
-    uint256 private MIN_COMPOUND_AMOUNT;
-    uint256 private CAP_STAKE_FX_TARGET; 
-    uint256 private UNSTAKE_FX_TARGET;
-    uint256 private STAKE_FX_TARGET;
+    uint256 private MIN_COMPOUND_AMOUNT;        // Minimum reward amount to compound when stake happen
+    uint256 private CAP_STAKE_FX_TARGET;        // Cap amount of FX delegation
+    uint256 private STAKE_FX_TARGET;            // Target stake amount to do whole validator list delegate
+    uint256 private UNSTAKE_FX_TARGET;              // Target unstake amount to split undelegate
     
     VaultInfo public vaultInfo;
-    mapping(uint256 => ValInfo) public valInfo;
+    mapping(uint256 => ValInfo) public valInfo;     // Validator info
     mapping(string => bool) public addedValidator;
 
     struct VaultInfo {
@@ -500,9 +500,11 @@ contract StakeFXVault is
             if (valInfo[i].allocPoint == 0) {
                 (uint256 sharesAmount, ) = _delegation(valInfo[i].validator, address(this));
                 if (sharesAmount == 0) {
+                    addedValidator[valInfo[i].validator] = false;
                     uint256 lastIndex = vaultLength - 1;
                     valInfo[i] = valInfo[lastIndex];
                     delete valInfo[lastIndex];
+                    
                     vaultLength--;
                     i--;
                 }
