@@ -25,9 +25,9 @@ async function main() {
 
     const precompileStaking = "0x0000000000000000000000000000000000001003"
 
-    const stFX = "0x4e7082eD58a5Ccb52f98781C3323e8e16592cFbf"
-    const VestedFX = "0xf2b4f50dbBee6b54166dE5FB297768fD9286456d"
-    const feeTreasury = "0x66c2698443c072994DcC632483Bf9C69E1Ac61a6"
+    const stFX = "0x465A52C6bb4093eb696dcb71015CA8cEf344340E"
+    const VestedFX = "0xB0B8922Ac43d7789CFc4F5F35e330E05068E00F8"
+    const feeTreasury = "0xED3e5E36cD527B1Dc07AE84662494d92A7c8F7CA"
 
     const val0 = "fxvaloper1t67ryvnqmnud5g3vpmck00l3umelwkz7huh0s3"
     const val1 = "fxvaloper1etzrlsszsm0jaj4dp5l25vk3p4w0x4ntl64hlw"
@@ -48,8 +48,9 @@ async function main() {
     const delegation5 = await precompileStakingContract.delegation(val5,stFX);
 
     const balanceInWei0 = await ethers.provider.getBalance(stFX);
-    const balanceInWei1 = await ethers.provider.getBalance(feeTreasury);
-    console.log("Account balance:", balanceInWei0, balanceInWei1);
+    const balanceInWei1 = await ethers.provider.getBalance(VestedFX);
+    const balanceInWei2 = await ethers.provider.getBalance(feeTreasury);
+    console.log("Account balance:", balanceInWei0, balanceInWei1, balanceInWei2);
     
     console.log(delegation0, delegation1, delegation2, delegation3, delegation4, delegation5)
 

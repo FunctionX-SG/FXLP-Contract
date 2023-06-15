@@ -80,6 +80,6 @@ async function main() {
       process.exit(1);
     });
 
-    // StakeFXVault address: 0x4e7082eD58a5Ccb52f98781C3323e8e16592cFbf
-    // VestedFX address: 0xf2b4f50dbBee6b54166dE5FB297768fD9286456d
-    // feeTreasury address: 0x66c2698443c072994DcC632483Bf9C69E1Ac61a6
+    // Contract address: 0x465A52C6bb4093eb696dcb71015CA8cEf344340E
+    // Contract address: 0xB0B8922Ac43d7789CFc4F5F35e330E05068E00F8
+    // Contract address: 0xED3e5E36cD527B1Dc07AE84662494d92A7c8F7CA

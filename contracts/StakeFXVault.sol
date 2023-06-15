@@ -55,9 +55,10 @@ contract StakeFXVault is
 
     event Stake(address indexed user, uint256 amount, uint256 shares);
     event Unstake(address indexed user, uint256 amount, uint256 shares);
-    event ValidatorUpdated(string val, uint256 newAllocPoint);
-    event ValidatorAdded(string val, uint256 newAllocPoint);
     event Compound(address indexed user, uint256 compoundAmount);
+    event ValidatorAdded(string val, uint256 newAllocPoint);
+    event ValidatorRemoved(string val);
+    event ValidatorUpdated(string val, uint256 newAllocPoint);
     event VestedFXChanged(address newAddress);
     event FeeTreasuryChanged(address newAddress);
 
@@ -66,7 +67,7 @@ contract StakeFXVault is
         _;
     }
 
-    /****************************************** Core Functions ******************************************/
+    /****************************************** Core External Functions ******************************************/
     /**
      * @notice user stake FX to this contract
      */
@@ -543,13 +544,15 @@ contract StakeFXVault is
 
         for (uint256 i = 0; i < vaultLength; i++) {
             if (valInfo[i].allocPoint == 0) {
-                (uint256 sharesAmount, ) = _delegation(valInfo[i].validator, address(this));
+                string memory val = valInfo[i].validator;
+                (uint256 sharesAmount, ) = _delegation(val, address(this));
                 if (sharesAmount == 0) {
-                    addedValidator[valInfo[i].validator] = false;
+                    addedValidator[val] = false;
                     uint256 lastIndex = vaultLength - 1;
                     valInfo[i] = valInfo[lastIndex];
                     delete valInfo[lastIndex];
                     
+                    emit ValidatorRemoved(val);
                     vaultLength--;
                     i--;
                 }
