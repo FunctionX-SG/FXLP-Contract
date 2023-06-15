@@ -6,7 +6,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 abstract contract Governable is AccessControlUpgradeable {
     bytes32 public constant OWNER_ROLE = bytes32("OWNER_ROLE");
     bytes32 public constant GOVERNOR_ROLE = bytes32("GOVERNOR_ROLE");
-    bytes32 public constant OPERATOR_ROLE = bytes32("OPERATOR_ROLE");
+    bytes32 public constant OPERATOR_ROLE = bytes32("OPERATOR_ROLE");       // only contract address
     bytes32 public constant KEEPER_ROLE = bytes32("KEEPER_ROLE");
 
     function __Governable_init(address _owner, address _governor) internal {
@@ -17,7 +17,7 @@ abstract contract Governable is AccessControlUpgradeable {
         // Set OWNER_ROLE as the admin of all roles.
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
         _setRoleAdmin(GOVERNOR_ROLE, OWNER_ROLE);
-        _setRoleAdmin(OPERATOR_ROLE, GOVERNOR_ROLE);
+        _setRoleAdmin(OPERATOR_ROLE, OWNER_ROLE);
         _setRoleAdmin(KEEPER_ROLE, GOVERNOR_ROLE);
     }
 }

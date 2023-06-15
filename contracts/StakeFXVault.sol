@@ -71,7 +71,7 @@ contract StakeFXVault is
     /**
      * @notice user stake FX to this contract
      */
-    function stake() external payable {
+    function stake() external payable whenNotPaused {
         require(msg.value > 0, "Stake: 0 amount");
         uint256 totalAsset = totalAssets();
         require(msg.value + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
@@ -93,7 +93,7 @@ contract StakeFXVault is
      * @notice user unstake/ request undelegate FX
      * @param amount User's fx-LP receipt tokens
      */
-    function unstake(uint256 amount) external {
+    function unstake(uint256 amount) external whenNotPaused {
         require(amount > 0, "Unstake: 0 amount");
 
         uint256 sharesBalance = balanceOf(msg.sender);
@@ -114,7 +114,7 @@ contract StakeFXVault is
      * @param val validator address
      * @param amount Amount of user's delegate shares transferred to this contract
      */
-    function entrustDelegatedShare(string memory val, uint256 amount) external {
+    function entrustDelegatedShare(string memory val, uint256 amount) external whenNotPaused {
         require(amount > 0, "Entrust: 0 share");
 
         (uint256 sharesAmount, ) = _delegation(val, msg.sender);
@@ -144,7 +144,7 @@ contract StakeFXVault is
     /**
      * @notice compound delegation rewards
      */
-    function compound() public nonReentrant {
+    function compound() public nonReentrant whenNotPaused {
         uint256 delegateAmount = _claimReward() + pendingFxReward;
         pendingFxReward = 0;
 
@@ -469,6 +469,15 @@ contract StakeFXVault is
 
     /**************************************** Public/External View Functions ****************************************/
 
+    /**
+     * @notice Return total asset(FX) deposited
+     * @return Amount of asset(FX) deposited
+     */
+    function totalAssets() public view override returns (uint256) {
+        uint256 underlying = _getUnderlyingFX();
+        return underlying;
+    }
+
     function getValLength() public view returns (uint256) {
         return vaultInfo.length;
     }
@@ -488,15 +497,6 @@ contract StakeFXVault is
      */
     function getValInfo(uint256 index) public view returns (uint256, string memory) {
         return (valInfo[index].allocPoint, valInfo[index].validator);
-    }
-
-    /**
-     * @notice Return total asset(FX) deposited
-     * @return Amount of asset(FX) deposited
-     */
-    function totalAssets() public view override returns (uint256) {
-        uint256 underlying = _getUnderlyingFX();
-        return underlying;
     }
 
     /**
@@ -551,7 +551,7 @@ contract StakeFXVault is
                     uint256 lastIndex = vaultLength - 1;
                     valInfo[i] = valInfo[lastIndex];
                     delete valInfo[lastIndex];
-                    
+
                     emit ValidatorRemoved(val);
                     vaultLength--;
                     i--;

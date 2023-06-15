@@ -22,63 +22,51 @@ abstract contract BaseVault is Governable, PausableUpgradeable, ERC4626Upgradeab
         __Governable_init(_owner, _governor);
     }
 
-    // ============================= Public functions ================================ //
-
-    function burn(uint256 amount) public onlyRole(OPERATOR_ROLE) {
-        _burn(msg.sender, amount);
-    }
-
-    // ============================= Operable functions ================================ //
+    // ============================= Revert functions ================================ //
     /**
      * @dev See {openzeppelin-IERC4626-deposit}.
      */
-    function deposit(uint256 _assets, address _receiver)
+    function deposit(uint256 , address )
         public
         override
-        whenNotPaused
-        onlyRole(OPERATOR_ROLE)
         returns (uint256)
     {
-        return super.deposit(_assets, _receiver);
+        revert("disabled");
+
     }
 
     /**
      * @dev See {openzeppelin-IERC4626-mint}.
      */
-    function mint(uint256 _shares, address _receiver)
+    function mint(uint256 , address )
         public
         override
-        whenNotPaused
-        onlyRole(OPERATOR_ROLE)
         returns (uint256)
     {
-        return super.mint(_shares, _receiver);
+        revert("disabled");
+
     }
 
     /**
      * @dev See {openzeppelin-IERC4626-withdraw}.
      */
-    function withdraw(uint256 _assets, address _receiver, address _owner)
+    function withdraw(uint256 , address , address )
         public
         override
-        whenNotPaused
-        onlyRole(OPERATOR_ROLE)
         returns (uint256)
     {
-        return super.withdraw(_assets, _receiver, _owner);
+        revert("disabled");
     }
 
     /**
      * @dev See {openzeppelin-IERC4626-redeem}.
      */
-    function redeem(uint256 _shares, address _receiver, address _owner)
+    function redeem(uint256 , address , address )
         public
         override
-        whenNotPaused
-        onlyRole(OPERATOR_ROLE)
         returns (uint256)
     {
-        return super.redeem(_shares, _receiver, _owner);
+        revert("disabled");
     }
 
 
