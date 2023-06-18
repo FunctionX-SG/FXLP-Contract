@@ -10,6 +10,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import {IVestedFX} from "./interfaces/IVestedFX.sol";
+import {IRewardDistributor} from "./interfaces/IRewardDistributor.sol";
 import {BaseVault} from "./vaults/BaseVault.sol";
 import {PrecompileStaking} from "./imp/PrecompileStaking.sol";
 
@@ -24,6 +25,7 @@ contract StakeFXVault is
     using MathUpgradeable for uint256;
 
     uint256 internal constant BIPS_DIVISOR = 10000;
+    uint256 internal constant PRECISION = 1e30;
 
     uint256 public pendingFxReward;             // FX delegation rewards inside the contract pending for compound
     uint256 public feeOnReward;                 // Compound reward protocol fee
@@ -31,6 +33,7 @@ contract StakeFXVault is
     uint256 public feeOnWithdrawal;             // Withdrawal fee
     address public vestedFX;                    // Contract that stored user's withdrawal info
     address public feeTreasury;                 // Contract that keep compound reward fee
+    address public distributor;                 // Reward token distributor
 
     uint256 private MIN_COMPOUND_AMOUNT;        // Minimum reward amount to compound when stake happen
     uint256 private CAP_STAKE_FX_TARGET;        // Cap amount of FX delegation
@@ -39,6 +42,7 @@ contract StakeFXVault is
     
     VaultInfo public vaultInfo;                     // Vault Info
     mapping(uint256 => ValInfo) public valInfo;     // Validator info
+    mapping (address => UserInfo) public userInfo;  // User info
     mapping(string => bool) public addedValidator;  // True if validator is added
 
     struct VaultInfo {
@@ -46,6 +50,7 @@ contract StakeFXVault is
         uint256 unstakeId;
         uint256 length;        
         uint256 totalAllocPoint;
+        uint256 cumulativeRewardPerToken;
     }
 
     struct ValInfo {
@@ -53,14 +58,21 @@ contract StakeFXVault is
         string validator;
     }
 
+    struct UserInfo {
+        uint256 claimableReward;
+        uint256 previousCumulatedRewardPerToken;
+    }
+
     event Stake(address indexed user, uint256 amount, uint256 shares);
     event Unstake(address indexed user, uint256 amount, uint256 shares);
     event Compound(address indexed user, uint256 compoundAmount);
+    event Claim(address receiver, uint256 amount);
     event ValidatorAdded(string val, uint256 newAllocPoint);
     event ValidatorRemoved(string val);
     event ValidatorUpdated(string val, uint256 newAllocPoint);
     event VestedFXChanged(address newAddress);
     event FeeTreasuryChanged(address newAddress);
+    event DistributorChanged(address newAddress);
 
     modifier onlyVestedFX() {
         require(msg.sender == vestedFX, "Only VestedFX can call");
@@ -80,7 +92,9 @@ contract StakeFXVault is
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
             compound();
         }
-        
+
+        _claim(msg.sender, msg.sender);
+
         uint256 shares = previewDeposit(msg.value);
         _mint(msg.sender, shares);
 
@@ -95,15 +109,15 @@ contract StakeFXVault is
      */
     function unstake(uint256 amount) external whenNotPaused {
         require(amount > 0, "Unstake: 0 amount");
-
         uint256 sharesBalance = balanceOf(msg.sender);
         require(sharesBalance >= amount, "Amount > stake");
+
+        _claim(msg.sender, msg.sender);
 
         uint256 undelegateAmount = previewRedeem(amount);
         uint256 undelegateAmountAfterFee = undelegateAmount * (BIPS_DIVISOR - feeOnWithdrawal) / BIPS_DIVISOR;
 
         _burn(msg.sender, amount);
-        
         _unstake(undelegateAmountAfterFee);
      
         emit Unstake(msg.sender, undelegateAmountAfterFee, amount);
@@ -141,18 +155,22 @@ contract StakeFXVault is
         emit Stake(msg.sender, fxAmountToTransfer, shares); 
     }
 
+    function claim(address receiver) external nonReentrant returns (uint256) {
+        return _claim(msg.sender, receiver);
+    }
+
     /**
      * @notice compound delegation rewards
      */
     function compound() public nonReentrant whenNotPaused {
-        uint256 delegateAmount = _claimReward() + pendingFxReward;
+        uint256 delegateReward = _withdrawReward() + pendingFxReward;
         pendingFxReward = 0;
 
-        uint256 feeProtocol = (delegateAmount * feeOnReward) / BIPS_DIVISOR;
-        uint256 feeCompounder = (delegateAmount * feeOnCompounder) / BIPS_DIVISOR;
+        uint256 feeProtocol = (delegateReward * feeOnReward) / BIPS_DIVISOR;
+        uint256 feeCompounder = (delegateReward * feeOnCompounder) / BIPS_DIVISOR;
 
-        delegateAmount = delegateAmount - feeProtocol - feeCompounder;
-        _stake(delegateAmount);
+        delegateReward = delegateReward - feeProtocol - feeCompounder;
+        _stake(delegateReward);
 
         address treasury = payable(feeTreasury);
         address user = payable(msg.sender);
@@ -160,7 +178,7 @@ contract StakeFXVault is
         (bool successUser, ) = user.call{value: feeCompounder}("");
         require(successTreasury && successUser, "Failed to send FX");
 
-        emit Compound(msg.sender, delegateAmount);
+        emit Compound(msg.sender, delegateReward);
     }
 
     function sendVestedFX(
@@ -169,6 +187,10 @@ contract StakeFXVault is
         address recipient = payable(msg.sender);
         (bool success, ) = recipient.call{value: safeAmount}("");
         require(success, "Failed to send FX");
+    }
+
+    function updateRewards() external nonReentrant {
+        _updateRewards(address(0));
     }
 
     /**************************************** Internal and Private Functions ****************************************/
@@ -411,11 +433,11 @@ contract StakeFXVault is
     }
 
     /**
-    * @dev Helper function to claim rewards from all validators.
+    * @dev Helper function to withdraw delegation fx rewards from all validators.
     */
-    function _claimReward() internal returns (uint256) {
+    function _withdrawReward() internal returns (uint256) {
         VaultInfo memory vault = vaultInfo;
-        uint256 claimedReward = 0;
+        uint256 reward = 0;
         
         uint256 vaultLength = vault.length;
 
@@ -424,11 +446,11 @@ contract StakeFXVault is
             uint256 delegationReward = _delegationRewards(validator, address(this));
             if(delegationReward > 0) {
                 uint256 returnReward = _withdraw(validator);
-                claimedReward += returnReward;
+                reward += returnReward;
             }
         }
 
-        return claimedReward;
+        return reward;
     }
 
     /**
@@ -443,7 +465,7 @@ contract StakeFXVault is
         uint256 delegateAmountInEther = delegateAmount / 10**18;
 
         uint256 valLength = getValLength();
-        while (delegateAmountInEther != 0) {
+        while (delegateAmountInEther >= 10) {
             delegateAmountInEther /= 10;
             numValidators++;
         }
@@ -466,6 +488,63 @@ contract StakeFXVault is
         }
         return totalAmount;
     }
+
+    function _claim(address account, address receiver) private returns (uint256) {
+        _updateRewards(account);
+        UserInfo storage user = userInfo[account];
+        uint256 tokenAmount = user.claimableReward;
+        user.claimableReward = 0;
+
+        if (tokenAmount > 0) {
+            IERC20Upgradeable(rewardToken()).safeTransfer(receiver, tokenAmount);
+            emit Claim(account, tokenAmount);
+        }
+
+        return tokenAmount;
+    }
+
+    function _updateRewards(address account) private {
+        uint256 blockReward = IRewardDistributor(distributor).distribute();
+
+        uint256 supply = totalSupply();
+        uint256 _cumulativeRewardPerToken = vaultInfo.cumulativeRewardPerToken;
+        if (supply > 0 && blockReward > 0) {
+            _cumulativeRewardPerToken = _cumulativeRewardPerToken + (blockReward * (PRECISION) / (supply));
+            vaultInfo.cumulativeRewardPerToken = _cumulativeRewardPerToken;
+        }
+
+        // cumulativeRewardPerToken can only increase
+        // so if cumulativeRewardPerToken is zero, it means there are no rewards yet
+        if (_cumulativeRewardPerToken == 0) {
+            return;
+        }
+
+        if (account != address(0)) {
+            UserInfo storage user = userInfo[account];
+            uint256 stakedAmount = balanceOf(account);
+            uint256 accountReward = stakedAmount * (_cumulativeRewardPerToken - (user.previousCumulatedRewardPerToken)) / (PRECISION);
+            uint256 _claimableReward = user.claimableReward + (accountReward);
+
+            user.claimableReward = _claimableReward;
+            user.previousCumulatedRewardPerToken = _cumulativeRewardPerToken;
+        }
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal
+        whenNotPaused
+        override
+    {
+        _updateRewards(from);
+        _updateRewards(to);
+
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(OWNER_ROLE) {} 
+
 
     /**************************************** Public/External View Functions ****************************************/
 
@@ -515,6 +594,23 @@ contract StakeFXVault is
 
     function getVaultConfigs() public view returns (uint256, uint256, uint256, uint256) {
         return (MIN_COMPOUND_AMOUNT, CAP_STAKE_FX_TARGET, UNSTAKE_FX_TARGET, STAKE_FX_TARGET);
+    }
+
+    function rewardToken() public view returns (address) {
+        return IRewardDistributor(distributor).rewardToken();
+    }
+
+    function claimable(address account) public view returns (uint256) {
+        UserInfo memory user = userInfo[account];
+        uint256 stakedAmount = balanceOf(account);
+        if (stakedAmount == 0) {
+            return user.claimableReward;
+        }
+        uint256 supply = totalSupply();
+        uint256 pendingRewards = IRewardDistributor(distributor).pendingRewards() * (PRECISION);
+        uint256 nextCumulativeRewardPerToken = vaultInfo.cumulativeRewardPerToken + (pendingRewards / (supply));
+        return user.claimableReward + (
+            stakedAmount * (nextCumulativeRewardPerToken - (user.previousCumulatedRewardPerToken)) / (PRECISION));
     }
 
     /**************************************** Only Governor Functions ****************************************/
@@ -598,6 +694,11 @@ contract StakeFXVault is
         feeTreasury = newAddress;
         emit FeeTreasuryChanged(newAddress);
     }
+    
+    function updateDistributor(address newAddress) external onlyRole(OWNER_ROLE) {
+        distributor = newAddress;
+        emit DistributorChanged(newAddress);
+    }
 
     function recoverToken(
         address token,
@@ -616,10 +717,6 @@ contract StakeFXVault is
         (bool success, ) = recipient.call{value: safeAmount}("");
         require(success, "Failed to send FX");
     }
-
-    function _authorizeUpgrade(
-        address
-    ) internal override onlyRole(OWNER_ROLE) {} 
 
     /**************************************************************
      * @dev Initialize the states

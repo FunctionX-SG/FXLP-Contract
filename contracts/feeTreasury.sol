@@ -15,7 +15,7 @@ import {IVestedFX} from "./interfaces/IVestedFX.sol";
  *
  * @notice Holds an ERC-20 token. Allows the owner to transfer the token or set allowances.
  */
-contract feeTreasury is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract FeeTreasury is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     uint256 private constant REVISION = 1;
