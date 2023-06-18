@@ -41,7 +41,6 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
 
     /* ========== EVENTS ========== */
     event VestingEntryCreated(address indexed beneficiary, uint256 startTime, uint256 endTime, uint256 quantity, uint256 index);
-    event VestingEntryQueued(uint256 indexed index, address indexed beneficiary, uint256 quantity);
     event Vested(address indexed beneficiary, uint256 vestedQuantity, uint256 index);
 
     receive() external payable {}
@@ -84,7 +83,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         return totalVesting;
     }
 
-    /**************************************** Internal and View Functions ****************************************/
+    /**************************************** View Functions ****************************************/
     /**
     * @notice The number of vesting dates in an account's schedule.
     */
@@ -108,6 +107,14 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         for (uint256 i = 0; i < schedulesLength; i++) {
             schedules[i] = accountVestingSchedules[account].data[i];
         }
+    }
+
+    function getstakeFXVault() external view returns (address) {
+        return address(stakeFXVault);
+    }
+
+    function getFxFeeTreasury() external view returns (address) {
+        return address(fxFeeTreasury);
     }
 
     /* ==================== INTERNAL FUNCTIONS ==================== */
@@ -181,15 +188,6 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         return uint32(block.timestamp);
     }
 
-    /**************************************** External View Functions ****************************************/
-    
-    function getstakeFXVault () external view returns (address) {
-        return address(stakeFXVault);
-    }
-
-    function getFxFeeTreasury () external view returns (address) {
-        return address(fxFeeTreasury);
-    }
 
     /**************************************** Only Authorised Functions ****************************************/
 
