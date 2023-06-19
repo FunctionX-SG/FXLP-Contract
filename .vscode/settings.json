@@ -1,6 +1,0 @@
-{
-    "solidity.compileUsingRemoteVersion": "latest",
-    "solidity.remappings": [
-        "@openzeppelin/=/Users/cheekeatlim/Desktop/FXProject/smartContract/fxLP_delegate_compound/node_modules/@openzeppelin"
-    ]
-}
