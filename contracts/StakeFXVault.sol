@@ -139,9 +139,10 @@ contract StakeFXVault is
             compound();
         }
 
+        _claim(msg.sender, msg.sender);
+        
         uint256 totalAsset = totalAssets();
         uint256 supply = totalSupply();
-
         (uint256 fxAmountToTransfer, uint256 returnRewards) = _transferFromShares(val, msg.sender, address(this), amount);
 
         pendingFxReward += returnRewards;
