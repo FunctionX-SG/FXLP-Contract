@@ -11,6 +11,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/se
 
 import {IVestedFX} from "./interfaces/IVestedFX.sol";
 import {IRewardDistributor} from "./interfaces/IRewardDistributor.sol";
+import {IWFX} from "./interfaces/IWFX.sol";
 import {BaseVault} from "./vaults/BaseVault.sol";
 import {PrecompileStaking} from "./imp/PrecompileStaking.sol";
 
@@ -45,6 +46,9 @@ contract StakeFXVault is
     mapping (address => UserInfo) public userInfo;  // User info
     mapping(string => bool) public addedValidator;  // True if validator is added
 
+    // Newly added storage
+    address constant WFX = 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19;  // WFX mainnet 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd
+
     struct VaultInfo {
         uint256 stakeId;
         uint256 unstakeId;
@@ -74,6 +78,8 @@ contract StakeFXVault is
     event FeeTreasuryChanged(address newAddress);
     event DistributorChanged(address newAddress);
 
+    receive() external payable {}
+
     modifier onlyVestedFX() {
         require(msg.sender == vestedFX, "Only VestedFX can call");
         _;
@@ -101,6 +107,32 @@ contract StakeFXVault is
         _stake(msg.value);
 
         emit Stake(msg.sender, msg.value, shares);
+    }
+
+    /**
+     * @notice user stake WFX to this contract
+     */
+    function stakeWFX(uint256 amount) external whenNotPaused {
+        require(amount > 0, "Stake: 0 amount");
+        uint256 totalAsset = totalAssets();
+        require(amount + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
+
+        uint256 delegationReward = getTotalDelegationRewards();
+        if(delegationReward >= MIN_COMPOUND_AMOUNT) {
+            compound();
+        }
+
+        _claim(msg.sender, msg.sender);
+
+        IWFX(WFX).transferFrom(msg.sender, address(this), amount); 
+        IWFX(WFX).withdraw(payable(address(this)), amount);
+
+        uint256 shares = previewDeposit(amount);
+        _mint(msg.sender, shares);
+
+        _stake(amount);
+
+        emit Stake(msg.sender, amount, shares);
     }
 
     /**
