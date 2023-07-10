@@ -33,6 +33,11 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function setAdmin(address _admin) external onlyRole(OWNER_ROLE) {
         admin = _admin;
     }
@@ -84,11 +89,7 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
 
     /**************************************************************
      * @dev Initialize the states
-     *************************************************************/
-    // constructor() public {
-
-    // }
-    
+     *************************************************************/    
     function initialize(
         address _rewardToken, address _rewardTracker, address _owner, address _governor
     ) public initializer {

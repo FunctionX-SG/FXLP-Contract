@@ -21,8 +21,8 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
     struct VestingSchedule {
         uint64 startTime;
         uint64 endTime;
-        uint128 quantity;
-        uint128 vestedQuantity;
+        uint256 quantity;
+        uint256 vestedQuantity;
     }
 
     struct VestingSchedules {
@@ -51,6 +51,11 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /****************************************** Core Functions ******************************************/
     /**
     * @dev Allow a user to vest all ended schedules
@@ -73,7 +78,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
             if (vestQuantity == 0) {
             continue;
             }
-            schedules.data[indexes[i]].vestedQuantity = uint128(uint256(schedule.vestedQuantity) + (vestQuantity));
+            schedules.data[indexes[i]].vestedQuantity = (schedule.vestedQuantity) + (vestQuantity);
 
             totalVesting = totalVesting + (vestQuantity);
 
@@ -131,7 +136,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
             if (_getBlockTime() < schedule.endTime) {
             continue;
             }
-            uint256 vestQuantity = uint256(schedule.quantity) - (schedule.vestedQuantity);
+            uint256 vestQuantity = (schedule.quantity) - (schedule.vestedQuantity);
             if (vestQuantity == 0) {
             continue;
             }
@@ -171,7 +176,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
     */
     function _getVestingQuantity(VestingSchedule memory schedule) internal view returns (uint256) {
         if (_getBlockTime() >= uint256(schedule.endTime)) {
-            return uint256(schedule.quantity) - (schedule.vestedQuantity);
+            return (schedule.quantity) - (schedule.vestedQuantity);
         }
         if (_getBlockTime() <= uint256(schedule.startTime)) {
             return 0;
@@ -201,7 +206,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         schedules.data[schedulesLength] = VestingSchedule({
             startTime: uint64(block.timestamp),
             endTime: uint64(endTime),
-            quantity: uint64(quantity),
+            quantity: quantity,
             vestedQuantity: 0
         });
         schedules.length = schedulesLength + 1;

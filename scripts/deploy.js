@@ -23,24 +23,24 @@ async function main() {
     const governor = "0xfe6e9353000a31B9C87F4EAE411C89b1E355Ba50"
     const asset = "0x0000000000000000000000000000000000000000"
 
-    const vault= "0xE8b437ff25766177F8f7258e68bCf7F13083d828"
-    const vest= ""
-    // const treasury= ""
-    const reward = "0xA8848a945c1AFeEdB6E3893cac22F0b460c49B77"
+    const vault= "0x5aF7AC9DfE8C894E88a197033E550614f2214665"
+    const vest= "0xEe541f260C9fa4bFED73fF97C1dfB0483A684259"
+    const treasury= "0x1dB21fF54414f62FD65D98c6D5FEdCe6C07CeF10"
+    const reward = "0x28630568bC33Ead4f4A48c0637Dae30aC1114332"
 
     const start = new Date();
     const startTimeStamp = (parseInt(start.getTime()/1000) + 60).toString()
     console.log(start,startTimeStamp)    
 
 
-    // ============ Deploy StakeFXVault ============
+    // // ============ Deploy StakeFXVault ============
 
     const StakeFXVault = await ethers.getContractFactory("StakeFXVault");
     const stakeFXVault = await upgrades.upgradeProxy(vault, StakeFXVault, {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // const stakeFXVault = await upgrades.deployProxy(StakeFXVault, [asset, owner, governor], {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // await stakeFXVault.deployed();
 
-    // await stakeFXVault.updateConfigs(tokens("1"),tokens("10000"),tokens("30"),tokens("30"));
+    // await stakeFXVault.updateConfigs(tokens("1"),tokens("1000000"),tokens("30"),tokens("30"));
     // await stakeFXVault.updateFees("100","50","50");
     
     // await stakeFXVault.addValidator("fxvaloper1t67ryvnqmnud5g3vpmck00l3umelwkz7huh0s3", "1000")
@@ -51,38 +51,39 @@ async function main() {
     // await stakeFXVault.addValidator("fxvaloper1sfw4q2uj8ag79usl562u5wz2rwgzavs0fw4tr2", "200")
     console.log("Contract address:", stakeFXVault.address);
 
-    // ============ Deploy VestedFX ============
+    // // ============ Deploy VestedFX ============
 
-    // const VestedFX = await ethers.getContractFactory("VestedFX");
-    // // const vestedFX = await upgrades.upgradeProxy(vest, VestedFX, {kind: "uups", timeout: '0', pollingInterval: '1000'});
-    // const vestedFX = await upgrades.deployProxy(VestedFX, [stakeFXVault.address], {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    const VestedFX = await ethers.getContractFactory("VestedFX");
+    const vestedFX = await upgrades.upgradeProxy(vest, VestedFX, {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    // const vestedFX = await upgrades.deployProxy(VestedFX, [vault], {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // await vestedFX.deployed();
     
-    // console.log("Contract address:", vestedFX.address);
+    console.log("Contract address:", vestedFX.address);
 
 
-    // ============ Deploy FXFeesTreasury ============
+    // // ============ Deploy FXFeesTreasury ============
 
     // const FXFeesTreasury = await ethers.getContractFactory("FeeTreasury");
     // const fxFeesTreasury = await upgrades.deployProxy(FXFeesTreasury, [], {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // await fxFeesTreasury.deployed();
-
-    // await fxFeesTreasury.updateVestedFX(vestedFX.address);
-    // await stakeFXVault.updateVestedFX(vestedFX.address);
 
     // console.log("Contract address:", fxFeesTreasury.address);
 
     // ============ Deploy RewardDistributor ============
 
     // const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-    // // const rewardDistributor = await upgrades.upgradeProxy("0x87DD57c7035E4000C22322572987ccE537cb7C25", RewardDistributor, {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    // const rewardDistributor = await upgrades.upgradeProxy("0x5ef13FBa677536Fd98C1c98E45D1201774feCC02", RewardDistributor, {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // const rewardDistributor = await upgrades.deployProxy(RewardDistributor, [reward, stakeFXVault.address, owner, owner], {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // await rewardDistributor.deployed();
 
     // console.log("Contract address:", rewardDistributor.address);
 
-    // await fxFeesTreasury.updateVestedFX(vestedFX.address);
+
+    /************** Setup ***************/
+    // const stakeFXVault = await ethers.getContractAt("StakeFXVault", vault);
+    // const fxFeesTreasury = await ethers.getContractAt("FeeTreasury", treasury);
     // await stakeFXVault.updateVestedFX(vestedFX.address);
+    // await fxFeesTreasury.updateVestedFX(vestedFX.address);
 
     // await stakeFXVault.updateFeeTreasury(fxFeesTreasury.address);
     // await stakeFXVault.updateDistributor(rewardDistributor.address);
@@ -97,6 +98,12 @@ async function main() {
     // await testTokenContract.transfer(rewardDistributor.address, tokens("10000000"));
 
     // console.log("Done2");
+
+    // await stakeFXVault.stake().send({ value: tokens("10000") });
+
+    // console.log("Done3");
+
+    // await rewardDistributor.updateRewardToken("0x88fd0beFa3C762C48BC695D8a90569936B73D22d");
   }
   
   main()
@@ -106,7 +113,7 @@ async function main() {
       process.exit(1);
     });
 
-// Contract address: 0xE8b437ff25766177F8f7258e68bCf7F13083d828
-// Contract address: 0x5b8316CDf1D3a503d0b3DC8961ACc0a8Ab84cCd0
-// Contract address: 0x18173b989dC4c8f71db1c06c21235Af6D1B1D8b0
-// Contract address: 0x5C814BE9043bFf0cA24d8612F701eFa8eDf06bC4
+    // Contract address: 0x5aF7AC9DfE8C894E88a197033E550614f2214665
+    // Contract address: 0xEe541f260C9fa4bFED73fF97C1dfB0483A684259
+    // Contract address: 0x1dB21fF54414f62FD65D98c6D5FEdCe6C07CeF10
+    // Contract address: 0x5ef13FBa677536Fd98C1c98E45D1201774feCC02

@@ -85,6 +85,11 @@ contract StakeFXVault is
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /****************************************** Core External Functions ******************************************/
     /**
      * @notice user stake FX to this contract
@@ -98,7 +103,6 @@ contract StakeFXVault is
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
             compound();
         }
-
         _claim(msg.sender, msg.sender);
 
         uint256 shares = previewDeposit(msg.value);
@@ -121,7 +125,6 @@ contract StakeFXVault is
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
             compound();
         }
-
         _claim(msg.sender, msg.sender);
 
         IWFX(WFX).transferFrom(msg.sender, address(this), amount); 
@@ -163,17 +166,19 @@ contract StakeFXVault is
     function entrustDelegatedShare(string memory val, uint256 amount) external whenNotPaused {
         require(amount > 0, "Entrust: 0 share");
 
-        (uint256 sharesAmount, ) = _delegation(val, msg.sender);
+        (uint256 sharesAmount, uint256 delegateAmount) = _delegation(val, msg.sender);
         require(sharesAmount >= amount, "Not enough share");
 
         uint256 delegationReward = getTotalDelegationRewards();
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
             compound();
         }
-
         _claim(msg.sender, msg.sender);
         
         uint256 totalAsset = totalAssets();
+        uint256 estimateDelegateAmount = amount / sharesAmount * delegateAmount;
+        require(estimateDelegateAmount + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
+
         uint256 supply = totalSupply();
         (uint256 fxAmountToTransfer, uint256 returnRewards) = _transferFromShares(val, msg.sender, address(this), amount);
 
@@ -390,7 +395,6 @@ contract StakeFXVault is
     //     vaultInfo.stakeId = index;
     //     pendingFxReward += totalReturnReward;
     // }
-
     
     /**
     * @dev Helper function to undelegate FX amount from validators.
