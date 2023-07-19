@@ -1,14 +1,11 @@
-node_modules
-.vscode
 .openzeppelin
+.vscode
+artifacts
+cache
+node_modules
 .env
 .secret
 coverage
 coverage.json
 typechain
 typechain-types
-
-# Hardhat files
-cache
-artifacts
-
