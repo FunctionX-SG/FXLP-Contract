@@ -5,10 +5,10 @@ require("@nomiclabs/hardhat-etherscan");
 
 const ALCHEMY_API_KEY = "oVlBkzgZrAVhL6zvDAB73MtQK7EiiRhH";
 const ETH_ALCHEMY_API_KEY = "h46tf7QGoc6jpx8nO0GrGoB6MumXB-u1";
-const TESTNET_PRIVATE_KEY = "784f911af2030e328daceccb1ccce8ae3fe954e23791e4ea8c2847af6c420d76";
 
 const fs = require('fs');
 const MAINNET_PRIVATE_KEY = fs.readFileSync(".secret").toString().trim();
+const TESTNET_PRIVATE_KEY = fs.readFileSync(".secret").toString().trim();
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
