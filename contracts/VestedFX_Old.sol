@@ -9,14 +9,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import {IVestedFX} from "./interfaces/IVestedFX.sol";           // Only for testnet to migrate data from old contract，it will be removed in mainnet
 import {IStakeFXVault} from "./interfaces/IStakeFXVault.sol";
 
-contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+
+contract VestedFX_Old is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     
     using SafeERC20Upgradeable for IERC20Upgradeable;
-    address private stakeFXVault;
-    address private fxFeeTreasury;
+    IStakeFXVault private stakeFXVault;
+    IStakeFXVault private fxFeeTreasury;
 
     struct VestingSchedule {
         uint64 startTime;
@@ -25,8 +25,13 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         uint256 vestedQuantity;
     }
 
+    struct VestingSchedules {
+        uint256 length;
+        mapping(uint256 => VestingSchedule) data;
+    }
+
     /// @dev vesting schedule of an account
-    mapping(address => VestingSchedule[]) private accountVestingSchedules;
+    mapping(address => VestingSchedules) private accountVestingSchedules;
 
     /// @dev An account's total escrowed balance per token to save recomputing this for fee extraction purposes
     mapping(address => uint256) public accountEscrowedBalance;
@@ -35,14 +40,14 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     mapping(address => uint256) public accountVestedBalance;
 
     /* ========== EVENTS ========== */
-    event VestingEntryCreated(address indexed beneficiary, uint256 startTime, uint256 endTime, uint256 quantity);
+    event VestingEntryCreated(address indexed beneficiary, uint256 startTime, uint256 endTime, uint256 quantity, uint256 index);
     event Vested(address indexed beneficiary, uint256 vestedQuantity, uint256 index);
 
     receive() external payable {}
 
     /* ========== MODIFIERS ========== */
     modifier onlyStakeFX() {
-        require(msg.sender == (stakeFXVault), "Only stakeFX can call");
+        require(msg.sender == address(stakeFXVault), "Only stakeFX can call");
         _;
     }
 
@@ -62,6 +67,27 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         return totalVesting;
     }
 
+    function vestScheduleAtIndices(uint256[] memory indexes) public nonReentrant returns (uint256) {
+        VestingSchedules storage schedules = accountVestingSchedules[msg.sender];
+        uint256 schedulesLength = schedules.length;
+        uint256 totalVesting = 0;
+        for (uint256 i = 0; i < indexes.length; i++) {
+            require(indexes[i] < schedulesLength, 'invalid schedule index');
+            VestingSchedule memory schedule = schedules.data[indexes[i]];
+            uint256 vestQuantity = _getVestingQuantity(schedule);
+            if (vestQuantity == 0) {
+            continue;
+            }
+            schedules.data[indexes[i]].vestedQuantity = (schedule.vestedQuantity) + (vestQuantity);
+
+            totalVesting = totalVesting + (vestQuantity);
+
+            emit Vested(msg.sender, vestQuantity, indexes[i]);
+        }
+        _completeVesting(totalVesting);
+        return totalVesting;
+    }
+
     /**************************************** View Functions ****************************************/
     /**
     * @notice The number of vesting dates in an account's schedule.
@@ -74,14 +100,18 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     * @dev manually get vesting schedule at index
     */
     function getVestingScheduleAtIndex(address account, uint256 index) external view returns (VestingSchedule memory) {
-        return accountVestingSchedules[account][index];
+        return accountVestingSchedules[account].data[index];
     }
 
     /**
     * @dev Get all schedules for an account.
     */
-    function getVestingSchedules(address account) external view returns (VestingSchedule[] memory) {
-        return accountVestingSchedules[account];
+    function getVestingSchedules(address account) external view returns (VestingSchedule[] memory schedules) {
+        uint256 schedulesLength = accountVestingSchedules[account].length;
+        schedules = new VestingSchedule[](schedulesLength);
+        for (uint256 i = 0; i < schedulesLength; i++) {
+            schedules[i] = accountVestingSchedules[account].data[i];
+        }
     }
 
     function getstakeFXVault() external view returns (address) {
@@ -97,28 +127,27 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     * @dev Allow a user to vest all ended schedules
     */
     function _vestCompletedSchedules() internal returns (uint256) {
-        VestingSchedule[] storage schedules = accountVestingSchedules[msg.sender];
+        VestingSchedules storage schedules = accountVestingSchedules[msg.sender];
         uint256 schedulesLength = schedules.length;
 
         uint256 totalVesting = 0;
         for (uint256 i = 0; i < schedulesLength; i++) {
-            VestingSchedule memory schedule = schedules[i];
+            VestingSchedule memory schedule = schedules.data[i];
             if (_getBlockTime() < schedule.endTime) {
                 continue;
             }
-
+            
             uint256 vestQuantity = (schedule.quantity) - (schedule.vestedQuantity);
             if (vestQuantity == 0) {
                 continue;
             }
-            schedules[i].vestedQuantity = schedule.quantity;
+            schedules.data[i].vestedQuantity = schedule.quantity;
             totalVesting = totalVesting + (vestQuantity);
 
             emit Vested(msg.sender, vestQuantity, i);
         }
         _completeVesting(totalVesting);
-        _clearClaimedSchedule();
-        
+
         return totalVesting;
     }
 
@@ -128,15 +157,15 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         accountEscrowedBalance[msg.sender] = accountEscrowedBalance[msg.sender] - (totalVesting);
         accountVestedBalance[msg.sender] = accountVestedBalance[msg.sender] + (totalVesting);
 
-        uint256 liquidity = (stakeFXVault).balance;
+        uint256 liquidity = address(stakeFXVault).balance;
 
         if(liquidity < totalVesting) {
              uint256 feesTreasuryLiquidity = address(fxFeeTreasury).balance;
              require((liquidity + feesTreasuryLiquidity) >= totalVesting, "Insuffient liq");
-             IStakeFXVault(fxFeeTreasury).sendVestedFX(totalVesting - liquidity);
-             IStakeFXVault(stakeFXVault).sendVestedFX(liquidity);
+             fxFeeTreasury.sendVestedFX(totalVesting - liquidity);
+             stakeFXVault.sendVestedFX(liquidity);
         } else {
-            IStakeFXVault(stakeFXVault).sendVestedFX(totalVesting);
+            stakeFXVault.sendVestedFX(totalVesting);
         }
         address recipient = payable(msg.sender);
         (bool success, ) = recipient.call{value: totalVesting}("");
@@ -144,29 +173,18 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-    * @dev Delete User claimed schedule
+    * @dev implements linear vesting mechanism
     */
-    function _clearClaimedSchedule() internal {
-        VestingSchedule[] storage schedules = accountVestingSchedules[msg.sender];
-        uint256 schedulesLength = schedules.length;
-
-        for (uint256 i = 0; i < schedulesLength; i++) {
-            VestingSchedule memory schedule = schedules[i];
-
-            uint256 vestQuantity = (schedule.quantity) - (schedule.vestedQuantity);
-            if (vestQuantity == 0) {
-                continue;
-            } else {
-                uint256 index = i;
-                for(uint256 i = 0; i < schedules.length-index; i++) {
-                    schedules[i] = schedules[i+index];      
-                }
-                for(uint256 i = 0; i < index; i++){
-                    schedules.pop();
-                }
-                break;                
-            }
+    function _getVestingQuantity(VestingSchedule memory schedule) internal view returns (uint256) {
+        if (_getBlockTime() >= uint256(schedule.endTime)) {
+            return (schedule.quantity) - (schedule.vestedQuantity);
         }
+        if (_getBlockTime() <= uint256(schedule.startTime)) {
+            return 0;
+        }
+        uint256 lockDuration = uint256(schedule.endTime) - (schedule.startTime);
+        uint256 passedDuration = _getBlockTime() - uint256(schedule.startTime);
+        return (passedDuration*(schedule.quantity)/(lockDuration)) - (schedule.vestedQuantity);
     }
 
     /**
@@ -176,55 +194,27 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
         return uint32(block.timestamp);
     }
 
+
     /**************************************** Only Authorised Functions ****************************************/
 
     function lockWithEndTime(address account, uint256 quantity, uint256 endTime) external onlyStakeFX {
         require(quantity > 0, '0 quantity');
 
-        VestingSchedule[] storage schedules = accountVestingSchedules[account];
+        VestingSchedules storage schedules = accountVestingSchedules[account];
+        uint256 schedulesLength = schedules.length;
 
         // append new schedule
-        schedules.push(VestingSchedule({
+        schedules.data[schedulesLength] = VestingSchedule({
             startTime: uint64(block.timestamp),
             endTime: uint64(endTime),
             quantity: quantity,
             vestedQuantity: 0
-        }));
-
+        });
+        schedules.length = schedulesLength + 1;
         // record total vesting balance of user
         accountEscrowedBalance[account] = accountEscrowedBalance[account] + (quantity);
 
-        emit VestingEntryCreated(account, block.timestamp, endTime, quantity);
-    }
-
-    /**
-    * @dev Only for testnet to migrate data from old contract，it will be removed in mainnet
-    */
-    function migrateData(address account) external onlyOwner {
-        require(account != address(0), '0 quantity');
-        address oldVestedFX = 0xEe541f260C9fa4bFED73fF97C1dfB0483A684259;
-        VestingSchedule[] storage schedules = accountVestingSchedules[account];
-        IVestedFX.VestingSchedule[] memory oldSchedules;
-
-        oldSchedules = IVestedFX(oldVestedFX).getVestingSchedules(account);
-        uint256 oldAccountEscrowedBalance = IVestedFX(oldVestedFX).accountEscrowedBalance(account);
-        uint256 oldAccountVestedBalance = IVestedFX(oldVestedFX).accountVestedBalance(account);
-
-        // append new schedule
-        for (uint256 i = 0; i < oldSchedules.length; i++) {
-            schedules.push(
-                VestingSchedule({
-                    startTime: uint64(oldSchedules[i].startTime),
-                    endTime: uint64(oldSchedules[i].endTime),
-                    quantity: oldSchedules[i].quantity,
-                    vestedQuantity: oldSchedules[i].vestedQuantity
-                })
-            );
-        }
-
-        // record total vesting balance of user
-        accountEscrowedBalance[account] = oldAccountEscrowedBalance;
-        accountVestedBalance[account] = oldAccountVestedBalance;
+        emit VestingEntryCreated(account, block.timestamp, endTime, quantity, schedulesLength);
     }
 
     function recoverToken(address token, uint256 amount, address recipient) external onlyOwner nonReentrant{
@@ -233,7 +223,7 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
     }
 
     function updateStakeFXVault(address _stakeFXVault) external onlyOwner nonReentrant{
-        stakeFXVault = _stakeFXVault;
+        stakeFXVault = IStakeFXVault(_stakeFXVault);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -242,11 +232,11 @@ contract VestedFXNew is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reen
      * @dev Initialize the states
      *************************************************************/
 
-    function initialize(address _stakeFXVault, address _fxFeeTreasury) public initializer {
-        stakeFXVault = _stakeFXVault;
-        fxFeeTreasury = _fxFeeTreasury;
+    function initialize(address _stakeFXVault) public initializer {
+        stakeFXVault = IStakeFXVault(_stakeFXVault);
 
         __Ownable_init();
         __UUPSUpgradeable_init();
     }
+
 }
