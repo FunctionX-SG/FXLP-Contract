@@ -25,9 +25,9 @@ async function main() {
 
     const precompileStaking = "0x0000000000000000000000000000000000001003"
 
-    const stFX = "0x465A52C6bb4093eb696dcb71015CA8cEf344340E"
-    const VestedFX = "0xB0B8922Ac43d7789CFc4F5F35e330E05068E00F8"
-    const feeTreasury = "0xED3e5E36cD527B1Dc07AE84662494d92A7c8F7CA"
+    const stFX = "0x5aF7AC9DfE8C894E88a197033E550614f2214665"
+    const VestedFX = "0x8E1D972703c0BbE65cbBa42bd75D0Eb41B8397b5"
+    const feeTreasury = "0x1dB21fF54414f62FD65D98c6D5FEdCe6C07CeF10"
 
     const val0 = "fxvaloper1t67ryvnqmnud5g3vpmck00l3umelwkz7huh0s3"
     const val1 = "fxvaloper1etzrlsszsm0jaj4dp5l25vk3p4w0x4ntl64hlw"

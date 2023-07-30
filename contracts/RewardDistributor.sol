@@ -83,6 +83,15 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
         return amount;
     }
 
+    function recoverToken(
+        address token,
+        uint256 amount,
+        address _recipient
+    ) external onlyRole(OWNER_ROLE) {
+        require(_recipient != address(0), "Send to zero address");
+        IERC20Upgradeable(token).safeTransfer(_recipient, amount);
+    }
+
     function _authorizeUpgrade(
         address
     ) internal override onlyRole(OWNER_ROLE) {} 
