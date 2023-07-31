@@ -7,8 +7,12 @@ const { ethers, waffle, upgrades } = require('hardhat');
 
 
 
-function tokens(n) {
+function tokensToWei(n) {
   return ethers.utils.parseUnits(n, '18');
+}
+
+function tokensToEther(n) {
+  return ethers.utils.formatUnits(n, '18');
 }
 
 async function main() {
@@ -28,6 +32,7 @@ async function main() {
     const stFX = "0x5aF7AC9DfE8C894E88a197033E550614f2214665"
     const VestedFX = "0x8E1D972703c0BbE65cbBa42bd75D0Eb41B8397b5"
     const feeTreasury = "0x1dB21fF54414f62FD65D98c6D5FEdCe6C07CeF10"
+    const multicall = "0x9A434d8253BC8A55e3e2de19275A71eA8Be63Cd4"
 
     const val0 = "fxvaloper1t67ryvnqmnud5g3vpmck00l3umelwkz7huh0s3"
     const val1 = "fxvaloper1etzrlsszsm0jaj4dp5l25vk3p4w0x4ntl64hlw"
@@ -38,22 +43,36 @@ async function main() {
 
     // ============ Deploy PrecompileStaking ============
 
-    const precompileStakingContract = await ethers.getContractAt("IPrecompileStaking", precompileStaking);
+    // const precompileStakingContract = await ethers.getContractAt("IPrecompileStaking", precompileStaking);
 
-    const delegation0 = await precompileStakingContract.delegation(val0,stFX);
-    const delegation1 = await precompileStakingContract.delegation(val1,stFX);
-    const delegation2 = await precompileStakingContract.delegation(val2,stFX);
-    const delegation3 = await precompileStakingContract.delegation(val3,stFX);
-    const delegation4 = await precompileStakingContract.delegation(val4,stFX);
-    const delegation5 = await precompileStakingContract.delegation(val5,stFX);
+    // const delegation0 = await precompileStakingContract.delegation(val0,stFX);
+    // const delegation1 = await precompileStakingContract.delegation(val1,stFX);
+    // const delegation2 = await precompileStakingContract.delegation(val2,stFX);
+    // const delegation3 = await precompileStakingContract.delegation(val3,stFX);
+    // const delegation4 = await precompileStakingContract.delegation(val4,stFX);
+    // const delegation5 = await precompileStakingContract.delegation(val5,stFX);
 
     const balanceInWei0 = await ethers.provider.getBalance(stFX);
-    const balanceInWei1 = await ethers.provider.getBalance(VestedFX);
-    const balanceInWei2 = await ethers.provider.getBalance(feeTreasury);
-    console.log("Account balance:", balanceInWei0, balanceInWei1, balanceInWei2);
+    // const balanceInWei1 = await ethers.provider.getBalance(VestedFX);
+    // const balanceInWei2 = await ethers.provider.getBalance(feeTreasury);
+    console.log("Account balance:", tokensToEther(balanceInWei0));
     
-    console.log(delegation0, delegation1, delegation2, delegation3, delegation4, delegation5)
+    // console.log(tokensToEther(delegation0[1].toString()))
+    // console.log(tokensToEther(delegation1[1].toString()))
+    // console.log(tokensToEther(delegation2[1].toString()))
+    // console.log(tokensToEther(delegation3[1].toString()))
+    // console.log(tokensToEther(delegation4[1].toString()))
+    // console.log(tokensToEther(delegation5[1].toString()))
 
+    const multicallContract = await ethers.getContractAt("MultiCall", multicall);
+    const allDelegation = await multicallContract.getAllValidatorDelegation();
+
+    console.log(tokensToEther(allDelegation[0][2].toString()))
+    console.log(tokensToEther(allDelegation[1][2].toString()))
+    console.log(tokensToEther(allDelegation[2][2].toString()))
+    console.log(tokensToEther(allDelegation[3][2].toString()))
+    console.log(tokensToEther(allDelegation[4][2].toString()))
+    console.log(tokensToEther(allDelegation[5][2].toString()))
   }
   
   main()
