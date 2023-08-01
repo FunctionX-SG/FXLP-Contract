@@ -322,7 +322,6 @@ contract StakeFXVault is
                         delegateAmount = allocDelegateAmount;
                     }
                 }
-                // uint256 returnReward;
                 
                 (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
                 _totalAssets += delegateAmount;
