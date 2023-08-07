@@ -43,12 +43,22 @@ contract FeeTreasury is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         return REVISION;
     }
 
-    function transfer(
+    function recoverToken(
         IERC20Upgradeable token,
         address recipient,
         uint256 amount
     ) external onlyOwner {
+        require(recipient != address(0), "Send to zero address");
         token.safeTransfer(recipient, amount);
+    }
+
+    function recoverFx(
+        uint256 safeAmount,
+        address _recipient
+    ) external onlyOwner {
+        address recipient = payable(_recipient);
+        (bool success, ) = recipient.call{value: safeAmount}("");
+        require(success, "Failed to send FX");
     }
 
     function sendVestedFX(

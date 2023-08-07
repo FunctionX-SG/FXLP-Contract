@@ -389,7 +389,7 @@ contract StakeFXVault is
 
         uint256 remainingAmount = amount;
         uint256 totalReward;        
-        uint256 returnUndelegateAmount;
+        uint256 returnUndelegatedAmount;
         uint256 returnReward;
         uint256 endTime;
         
@@ -400,17 +400,17 @@ contract StakeFXVault is
 
         if (amount >= UNSTAKE_FX_TARGET) {
             uint256 halfOfUndelegateAmount = amount / 2; 
-            (returnUndelegateAmount, returnReward, endTime) = _toUndelegate(index, halfOfUndelegateAmount);
+            (returnUndelegatedAmount, returnReward, endTime) = _toUndelegate(index, halfOfUndelegateAmount);
                 
-            remainingAmount -= returnUndelegateAmount;
+            remainingAmount -= returnUndelegatedAmount;
             index = (index + 1) % vaultLength;
             totalReward += returnReward;
         }
 
         while (remainingAmount != 0) {
-            (returnUndelegateAmount, returnReward, endTime) = _toUndelegate(index, remainingAmount);
+            (returnUndelegatedAmount, returnReward, endTime) = _toUndelegate(index, remainingAmount);
             
-            remainingAmount -= returnUndelegateAmount;
+            remainingAmount -= returnUndelegatedAmount;
             index = (index + 1) % vaultLength;
             totalReward += returnReward;
         }
@@ -445,7 +445,9 @@ contract StakeFXVault is
             }
 
             uint256 shareToWithdraw = (sharesAmount * amountToUndelegate) / delegationAmount;
-            (amountToUndelegate, returnReward, endTime) = _undelegate(valInfo[index].validator, shareToWithdraw);
+            if (shareToWithdraw > 0) {
+                (amountToUndelegate, returnReward, endTime) = _undelegate(valInfo[index].validator, shareToWithdraw);
+            }
         }
 
         return (amountToUndelegate, returnReward, endTime);

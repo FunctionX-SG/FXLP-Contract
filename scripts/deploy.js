@@ -35,10 +35,10 @@ async function main() {
 
     // ============ Deploy StakeFXVault ============
 
-    const StakeFXVault = await ethers.getContractFactory("StakeFXVault");
-    const stakeFXVault = await upgrades.upgradeProxy(stFX, StakeFXVault, {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    // const StakeFXVault = await ethers.getContractFactory("StakeFXVault");
+    // const stakeFXVault = await upgrades.upgradeProxy(stFX, StakeFXVault, {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // const stakeFXVault = await upgrades.deployProxy(StakeFXVault, [asset, owner, governor], {kind: "uups", timeout: '0', pollingInterval: '1000'});
-    await stakeFXVault.deployed();
+    // await stakeFXVault.deployed();
 
     // await stakeFXVault.updateConfigs(tokens("1"),tokens("1000000"),tokens("30"),tokens("30"));
     // await stakeFXVault.updateFees("100","50","50");
@@ -49,7 +49,7 @@ async function main() {
     // await stakeFXVault.addValidator("fxvaloper1v65jk0gvzqdghcclldex08cddc38dau6zty3j5", "600")
     // await stakeFXVault.addValidator("fxvaloper158gmj69jpfsrvee3a220afjs952p4m6kltc67h", "1200")
     // await stakeFXVault.addValidator("fxvaloper1sfw4q2uj8ag79usl562u5wz2rwgzavs0fw4tr2", "200")
-    console.log("Contract address:", stakeFXVault.address);
+    // console.log("Contract address:", stakeFXVault.address);
 
     // // ============ Deploy VestedFX ============
 
@@ -88,13 +88,14 @@ async function main() {
     // console.log("Contract address:", vestedFX.address);
 
 
-    // // ============ Deploy FXFeesTreasury ============
+    // ============ Deploy FXFeesTreasury ============
 
-    // const FXFeesTreasury = await ethers.getContractFactory("FeeTreasury");
+    const FXFeesTreasury = await ethers.getContractFactory("FeeTreasury");
+    const fxFeesTreasury = await upgrades.upgradeProxy(treasury, FXFeesTreasury, {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // const fxFeesTreasury = await upgrades.deployProxy(FXFeesTreasury, [], {kind: "uups", timeout: '0', pollingInterval: '1000'});
-    // await fxFeesTreasury.deployed();
+    await fxFeesTreasury.deployed();
 
-    // console.log("Contract address:", fxFeesTreasury.address);
+    console.log("Contract address:", fxFeesTreasury.address);
 
     // ============ Deploy RewardDistributor ============
 
