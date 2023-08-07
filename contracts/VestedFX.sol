@@ -164,7 +164,7 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
                 for(uint256 i = 0; i < index; i++){
                     schedules.pop();
                 }
-                break;                
+                break;
             }
         }
     }
@@ -200,32 +200,32 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
     /**
     * @dev Only for testnet to migrate data from old contract，it will be removed in mainnet
     */
-    function migrateData(address account) external onlyOwner {
-        require(account != address(0), '0 quantity');
-        address oldVestedFX = 0xEe541f260C9fa4bFED73fF97C1dfB0483A684259;
-        VestingSchedule[] storage schedules = accountVestingSchedules[account];
-        IVestedFX.VestingSchedule[] memory oldSchedules;
+    // function migrateData(address account) external onlyOwner {
+    //     require(account != address(0), '0 quantity');
+    //     address oldVestedFX = 0xEe541f260C9fa4bFED73fF97C1dfB0483A684259;
+    //     VestingSchedule[] storage schedules = accountVestingSchedules[account];
+    //     IVestedFX.VestingSchedule[] memory oldSchedules;
 
-        oldSchedules = IVestedFX(oldVestedFX).getVestingSchedules(account);
-        uint256 oldAccountEscrowedBalance = IVestedFX(oldVestedFX).accountEscrowedBalance(account);
-        uint256 oldAccountVestedBalance = IVestedFX(oldVestedFX).accountVestedBalance(account);
+    //     oldSchedules = IVestedFX(oldVestedFX).getVestingSchedules(account);
+    //     uint256 oldAccountEscrowedBalance = IVestedFX(oldVestedFX).accountEscrowedBalance(account);
+    //     uint256 oldAccountVestedBalance = IVestedFX(oldVestedFX).accountVestedBalance(account);
 
-        // append new schedule
-        for (uint256 i = 0; i < oldSchedules.length; i++) {
-            schedules.push(
-                VestingSchedule({
-                    startTime: uint64(oldSchedules[i].startTime),
-                    endTime: uint64(oldSchedules[i].endTime),
-                    quantity: oldSchedules[i].quantity,
-                    vestedQuantity: oldSchedules[i].vestedQuantity
-                })
-            );
-        }
+    //     // append new schedule
+    //     for (uint256 i = 0; i < oldSchedules.length; i++) {
+    //         schedules.push(
+    //             VestingSchedule({
+    //                 startTime: uint64(oldSchedules[i].startTime),
+    //                 endTime: uint64(oldSchedules[i].endTime),
+    //                 quantity: oldSchedules[i].quantity,
+    //                 vestedQuantity: oldSchedules[i].vestedQuantity
+    //             })
+    //         );
+    //     }
 
-        // record total vesting balance of user
-        accountEscrowedBalance[account] = oldAccountEscrowedBalance;
-        accountVestedBalance[account] = oldAccountVestedBalance;
-    }
+    //     // record total vesting balance of user
+    //     accountEscrowedBalance[account] = oldAccountEscrowedBalance;
+    //     accountVestedBalance[account] = oldAccountVestedBalance;
+    // }
 
     function recoverToken(address token, uint256 amount, address recipient) external onlyOwner nonReentrant{
         require(recipient != address(0), "Send to zero address");

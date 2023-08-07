@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.18;
 
-// import "../libraries/math/SafeMath.sol";
 import {SafeMathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -23,49 +22,17 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
     uint256 public lastDistributionTime;
     address public rewardTracker;
 
-    address public admin;
+    address public admin;   // removed in mainnet
 
     event Distribute(uint256 amount);
     event TokensPerIntervalChange(uint256 amount);
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "RewardDistributor: forbidden");
-        _;
-    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function setAdmin(address _admin) external onlyRole(OWNER_ROLE) {
-        admin = _admin;
-    }
-
-    // to help users who accidentally send their tokens to this contract
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyRole(OWNER_ROLE) {
-        IERC20Upgradeable(_token).safeTransfer(_account, _amount);
-    }
-
-    function updateLastDistributionTime() external onlyAdmin {
-        lastDistributionTime = block.timestamp;
-    }
-
-    function setTokensPerInterval(uint256 _amount) external onlyRole(GOVERNOR_ROLE) {
-        require(lastDistributionTime != 0, "RewardDistributor: invalid lastDistributionTime");
-        IStakeFXVault(rewardTracker).updateRewards();
-        tokensPerInterval = _amount;
-        emit TokensPerIntervalChange(_amount);
-    }
-
-    function pendingRewards() public view override returns (uint256) {
-        if (block.timestamp == lastDistributionTime) {
-            return 0;
-        }
-
-        uint256 timeDiff = block.timestamp.sub(lastDistributionTime);
-        return tokensPerInterval.mul(timeDiff);
-    }
+    /**************************************** Core Functions ****************************************/
 
     function distribute() external override returns (uint256) {
         require(msg.sender == rewardTracker, "RewardDistributor: invalid msg.sender");
@@ -82,6 +49,32 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
         emit Distribute(amount);
         return amount;
     }
+
+    /**************************************** View Functions ****************************************/
+
+    function pendingRewards() public view override returns (uint256) {
+        if (block.timestamp == lastDistributionTime) {
+            return 0;
+        }
+
+        uint256 timeDiff = block.timestamp.sub(lastDistributionTime);
+        return tokensPerInterval.mul(timeDiff);
+    }
+
+    /**************************************** Only Admin/Governor Functions ****************************************/
+
+    function updateLastDistributionTime() external onlyRole(GOVERNOR_ROLE) {
+        lastDistributionTime = block.timestamp;
+    }
+
+    function setTokensPerInterval(uint256 _amount) external onlyRole(GOVERNOR_ROLE) {
+        require(lastDistributionTime != 0, "RewardDistributor: invalid lastDistributionTime");
+        IStakeFXVault(rewardTracker).updateRewards();
+        tokensPerInterval = _amount;
+        emit TokensPerIntervalChange(_amount);
+    }
+
+    /**************************************** Only Owner Functions ****************************************/
 
     function recoverToken(
         address token,

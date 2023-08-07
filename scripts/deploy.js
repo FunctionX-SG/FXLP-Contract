@@ -90,21 +90,21 @@ async function main() {
 
     // ============ Deploy FXFeesTreasury ============
 
-    const FXFeesTreasury = await ethers.getContractFactory("FeeTreasury");
-    const fxFeesTreasury = await upgrades.upgradeProxy(treasury, FXFeesTreasury, {kind: "uups", timeout: '0', pollingInterval: '1000'});
-    // const fxFeesTreasury = await upgrades.deployProxy(FXFeesTreasury, [], {kind: "uups", timeout: '0', pollingInterval: '1000'});
-    await fxFeesTreasury.deployed();
+    // const FXFeesTreasury = await ethers.getContractFactory("FeeTreasury");
+    // const fxFeesTreasury = await upgrades.upgradeProxy(treasury, FXFeesTreasury, {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    // // const fxFeesTreasury = await upgrades.deployProxy(FXFeesTreasury, [], {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    // await fxFeesTreasury.deployed();
 
-    console.log("Contract address:", fxFeesTreasury.address);
+    // console.log("Contract address:", fxFeesTreasury.address);
 
     // ============ Deploy RewardDistributor ============
 
-    // const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
-    // const rewardDistributor = await upgrades.upgradeProxy("0x5ef13FBa677536Fd98C1c98E45D1201774feCC02", RewardDistributor, {kind: "uups", timeout: '0', pollingInterval: '1000'});
+    const RewardDistributor = await ethers.getContractFactory("RewardDistributor");
+    const rewardDistributor = await upgrades.upgradeProxy("0x5ef13FBa677536Fd98C1c98E45D1201774feCC02", RewardDistributor, {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // const rewardDistributor = await upgrades.deployProxy(RewardDistributor, [reward, stakeFXVault.address, owner, owner], {kind: "uups", timeout: '0', pollingInterval: '1000'});
     // await rewardDistributor.deployed();
 
-    // console.log("Contract address:", rewardDistributor.address);
+    console.log("Contract address:", rewardDistributor.address);
 
     // ============ Deploy MultiCall ============
 

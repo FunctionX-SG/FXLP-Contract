@@ -333,50 +333,6 @@ contract StakeFXVault is
         vaultInfo.stakeId = index;
         pendingFxReward += totalReturnReward;
     }
-
-    // /**
-    // * @dev Helper function to delegate FX amount to validators evenly without consider allocPoint and cap.
-    // * @param  amount  The amount: FX delegate to validators.
-    // */
-    // function _stakeEvenly(uint256 amount) internal {
-    //     VaultInfo memory vault = vaultInfo;
-    //     uint256 index = vault.stakeId;
-    //     uint256 vaultLength = vault.length;
-    //     uint256 totalReturnReward;
-
-    //     // After execute removeValidator, stakeId may equal or greater than vaultLength
-    //     if (index >= vaultLength) {
-    //         index = 0;
-    //     }        
-
-    //     uint256 amountPerValidator = amount / _calculateNumberofValidators(amount);
-    //     uint256 delegateAmount;
-    //     uint256 allocPoint;
-        
-    //     while (amount != 0) {
-    //         ValInfo memory val = valInfo[index];
-    //         allocPoint = val.allocPoint;
-
-    //         if (allocPoint == 0) {
-    //             index = (index + 1) % vaultLength;
-    //             continue;
-    //         }
-
-    //         if (amount <= amountPerValidator) {
-    //             delegateAmount = amount;
-    //         } else {
-    //             delegateAmount = amountPerValidator;
-    //         }
-
-    //         (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
-    //         totalReturnReward += returnReward;
-    //         amount -= delegateAmount;
-    //         index = (index + 1) % vaultLength;
-    //     }
-
-    //     vaultInfo.stakeId = index;
-    //     pendingFxReward += totalReturnReward;
-    // }
     
     /**
     * @dev Helper function to undelegate FX amount from validators.
