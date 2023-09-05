@@ -13,7 +13,7 @@ import {IVestedFX} from "./interfaces/IVestedFX.sol";
  * @title Treasury
  * @author Baklava
  *
- * @notice Holds an ERC-20 token. Allows the owner to transfer the token or set allowances.
+ * @notice Holds an FX token. Allows the owner to transfer the token or set allowances.
  */
 contract FeeTreasury is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -68,7 +68,6 @@ contract FeeTreasury is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         (bool success, ) = recipient.call{value: safeAmount}("");
         require(success, "Failed to send FX");
     }
-
 
     function updateVestedFX(address newAddress) external onlyOwner {
         vestedFX = IVestedFX(newAddress);

@@ -7,7 +7,6 @@ abstract contract Governable is AccessControlUpgradeable {
     bytes32 public constant OWNER_ROLE = bytes32("OWNER_ROLE");
     bytes32 public constant GOVERNOR_ROLE = bytes32("GOVERNOR_ROLE");
     bytes32 public constant OPERATOR_ROLE = bytes32("OPERATOR_ROLE");       // only contract address
-    bytes32 public constant KEEPER_ROLE = bytes32("KEEPER_ROLE");
 
     function __Governable_init(address _owner, address _governor) internal {
         // Assign roles to the sender.
@@ -18,6 +17,12 @@ abstract contract Governable is AccessControlUpgradeable {
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
         _setRoleAdmin(GOVERNOR_ROLE, OWNER_ROLE);
         _setRoleAdmin(OPERATOR_ROLE, OWNER_ROLE);
-        _setRoleAdmin(KEEPER_ROLE, GOVERNOR_ROLE);
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[49] private __gap;
 }

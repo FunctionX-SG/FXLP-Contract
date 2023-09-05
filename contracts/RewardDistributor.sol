@@ -22,8 +22,6 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
     uint256 public lastDistributionTime;
     address public rewardTracker;
 
-    address public admin;   // removed in mainnet
-
     event Distribute(uint256 amount);
     event TokensPerIntervalChange(uint256 amount);
 
@@ -97,7 +95,6 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
     ) public initializer {
         rewardToken = _rewardToken;
         rewardTracker = _rewardTracker;
-        admin = msg.sender;
         
         __Governable_init(_owner, _governor);
         __UUPSUpgradeable_init();

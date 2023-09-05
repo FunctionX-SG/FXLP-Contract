@@ -19,7 +19,7 @@ contract MultiCall is
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    address constant stFX = 0x5aF7AC9DfE8C894E88a197033E550614f2214665;  // 
+    address stFX;
 
     struct ValidatorDelegationInfo {
         string validator;
@@ -58,6 +58,14 @@ contract MultiCall is
 
     /**************************************** Only Owner Functions ****************************************/
 
+    function updateStFX(
+        address _stFX
+    ) external onlyOwner() {
+        require(_stFX != address(0), "Cannot 0 add");
+        require(_stFX != stFX, "Cannot same add");
+        stFX = _stFX;
+    }
+
     function recoverToken(
         address token,
         uint256 amount,
@@ -75,7 +83,8 @@ contract MultiCall is
      * @dev Initialize the states
      *************************************************************/
 
-    function initialize() public initializer {
+    function initialize(address _stFX) public initializer {
+        stFX = _stFX;
         __Ownable_init();
         __UUPSUpgradeable_init();
     }

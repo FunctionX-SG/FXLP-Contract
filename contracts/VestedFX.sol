@@ -9,7 +9,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import {IVestedFX} from "./interfaces/IVestedFX.sol";           // Only for testnet to migrate data from old contract，it will be removed in mainnet
 import {IStakeFXVault} from "./interfaces/IStakeFXVault.sol";
 
 contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
@@ -149,22 +148,24 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
     function _clearClaimedSchedule() internal {
         VestingSchedule[] storage schedules = accountVestingSchedules[msg.sender];
         uint256 schedulesLength = schedules.length;
-
-        for (uint256 i = 0; i < schedulesLength; i++) {
-            VestingSchedule memory schedule = schedules[i];
+        uint256 index;
+        for (index = 0; index < schedulesLength; index++) {
+            VestingSchedule memory schedule = schedules[index];
 
             uint256 vestQuantity = (schedule.quantity) - (schedule.vestedQuantity);
             if (vestQuantity == 0) {
                 continue;
             } else {
-                uint256 index = i;
-                for(uint256 i = 0; i < schedules.length-index; i++) {
-                    schedules[i] = schedules[i+index];      
-                }
-                for(uint256 i = 0; i < index; i++){
-                    schedules.pop();
-                }
                 break;
+            }
+        }
+        
+        if (index != 0) {            
+            for(uint256 i = 0; i < schedules.length-index; i++) {
+                schedules[i] = schedules[i+index];      
+            }
+            for(uint256 i = 0; i < index; i++) {
+                schedules.pop();
             }
         }
     }
@@ -197,43 +198,17 @@ contract VestedFX is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentra
         emit VestingEntryCreated(account, block.timestamp, endTime, quantity);
     }
 
-    /**
-    * @dev Only for testnet to migrate data from old contract，it will be removed in mainnet
-    */
-    // function migrateData(address account) external onlyOwner {
-    //     require(account != address(0), '0 quantity');
-    //     address oldVestedFX = 0xEe541f260C9fa4bFED73fF97C1dfB0483A684259;
-    //     VestingSchedule[] storage schedules = accountVestingSchedules[account];
-    //     IVestedFX.VestingSchedule[] memory oldSchedules;
-
-    //     oldSchedules = IVestedFX(oldVestedFX).getVestingSchedules(account);
-    //     uint256 oldAccountEscrowedBalance = IVestedFX(oldVestedFX).accountEscrowedBalance(account);
-    //     uint256 oldAccountVestedBalance = IVestedFX(oldVestedFX).accountVestedBalance(account);
-
-    //     // append new schedule
-    //     for (uint256 i = 0; i < oldSchedules.length; i++) {
-    //         schedules.push(
-    //             VestingSchedule({
-    //                 startTime: uint64(oldSchedules[i].startTime),
-    //                 endTime: uint64(oldSchedules[i].endTime),
-    //                 quantity: oldSchedules[i].quantity,
-    //                 vestedQuantity: oldSchedules[i].vestedQuantity
-    //             })
-    //         );
-    //     }
-
-    //     // record total vesting balance of user
-    //     accountEscrowedBalance[account] = oldAccountEscrowedBalance;
-    //     accountVestedBalance[account] = oldAccountVestedBalance;
-    // }
-
-    function recoverToken(address token, uint256 amount, address recipient) external onlyOwner nonReentrant{
+    function recoverToken(address token, uint256 amount, address recipient) external onlyOwner {
         require(recipient != address(0), "Send to zero address");
         IERC20Upgradeable(token).safeTransfer(recipient, amount);
     }
 
-    function updateStakeFXVault(address _stakeFXVault) external onlyOwner nonReentrant{
+    function updateStakeFXVault(address _stakeFXVault) external onlyOwner {
         stakeFXVault = _stakeFXVault;
+    }
+
+    function updateFxFeeTreasury(address _fxFeeTreasury) external onlyOwner {
+        fxFeeTreasury = _fxFeeTreasury;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

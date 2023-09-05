@@ -3,8 +3,8 @@ require('@nomiclabs/hardhat-ethers');
 require('@openzeppelin/hardhat-upgrades');
 require("@nomiclabs/hardhat-etherscan");
 
-const ALCHEMY_API_KEY = "oVlBkzgZrAVhL6zvDAB73MtQK7EiiRhH";
-const ETH_ALCHEMY_API_KEY = "h46tf7QGoc6jpx8nO0GrGoB6MumXB-u1";
+const ALCHEMY_API_KEY = "";
+const ETH_ALCHEMY_API_KEY = "";
 
 const fs = require('fs');
 const MAINNET_PRIVATE_KEY = fs.readFileSync(".secret").toString().trim();
@@ -79,9 +79,9 @@ module.exports = {
       mainnet: "YOUR_ETHERSCAN_API_KEY",
       optimisticEthereum: "YOUR_OPTIMISTIC_ETHERSCAN_API_KEY",
       arbitrumOne: "YOUR_ARBISCAN_API_KEY",
-      bscTestnet: "K7IMNXV71X1IKYBX7FR7F5R72CZB3JUXXS",
-      avalancheFujiTestnet: "1HBGVI926B9RNSN97EKV5W5FCNQN11K1B2",     // EJECAN3SAN2PXS194A5VMN13NUFHKAR62D
-      avalanche: "1HBGVI926B9RNSN97EKV5W5FCNQN11K1B2"
+      bscTestnet: "YOUR_BSCSCAN_API_KEY",
+      avalancheFujiTestnet: "YOUR_SNOWTRACE_API_KEY", 
+      avalanche: "YOUR_SNOWTRACE_API_KEY"
     }
   },
   mocha: {
