@@ -20,9 +20,41 @@ library Decode {
         return (amount, reward, endTime);
     }
 
+    function redelegate(bytes memory data) internal pure returns (uint256, uint256, uint256) {
+        (uint256 _amount, uint256 _reward, uint256 _completionTime) = abi.decode(data, (uint256, uint256, uint256));
+        return (_amount, _reward, _completionTime);
+    }
+
+    function delegateV2(
+        bytes memory data
+    ) internal pure returns (bool) {
+        (bool _result) = abi.decode(data, (bool));
+        return (_result);
+    }
+
+    function undelegateV2(
+        bytes memory data
+    ) internal pure returns (bool) {
+        (bool _result) = abi.decode(
+            data,
+            (bool)
+        );
+        return (_result);
+    }
+
+    function redelegateV2(bytes memory data) internal pure returns (bool) {
+        (bool _result) = abi.decode(data, (bool));
+        return (_result);
+    }
+
     function withdraw(bytes memory data) internal pure returns (uint256) {
         uint256 reward = abi.decode(data, (uint256));
         return reward;
+    }
+
+    function transferShares(bytes memory data) internal pure returns (uint256, uint256) {
+        (uint256 token, uint256 reward) = abi.decode(data, (uint256, uint256));
+        return (token, reward);
     }
 
     function transferFromShares(bytes memory data) internal pure returns (uint256, uint256) {
@@ -36,8 +68,13 @@ library Decode {
     }
 
     function delegationRewards(bytes memory data) internal pure returns (uint256) {
-        uint256 rewardAmount= abi.decode(data, (uint256));
+        uint256 rewardAmount = abi.decode(data, (uint256));
         return rewardAmount;
+    }
+
+    function allowanceShares(bytes memory data) internal pure returns (uint256) {
+        uint256 allowanceAmount = abi.decode(data, (uint256));
+        return allowanceAmount;
     }
 
     function ok(

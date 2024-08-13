@@ -16,6 +16,7 @@ const TESTNET_PRIVATE_KEY = fs.readFileSync(".secret").toString().trim();
 module.exports = {
   solidity: {
     version: "0.8.18",
+
     settings: {
       optimizer: {
         enabled: true,
@@ -56,6 +57,14 @@ module.exports = {
     },
     fxTestnet: {
       url: `https://testnet-fx-json-web3.functionx.io:8545`,
+      accounts: [TESTNET_PRIVATE_KEY],
+      networkCheckTimeout: 999999,
+      timeoutBlocks: 200,
+      gas: 12400000,
+      gasPrice: 600000000000,
+    },
+    local: {
+      url: `http://192.168.1.115:8545`,
       accounts: [TESTNET_PRIVATE_KEY],
       networkCheckTimeout: 999999,
       timeoutBlocks: 200,

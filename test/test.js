@@ -67,12 +67,12 @@ async function main() {
     const multicallContract = await ethers.getContractAt("MultiCall", multicall);
     const allDelegation = await multicallContract.getAllValidatorDelegation();
 
-    console.log(tokensToEther(allDelegation[0][2].toString()))
-    console.log(tokensToEther(allDelegation[1][2].toString()))
-    console.log(tokensToEther(allDelegation[2][2].toString()))
-    console.log(tokensToEther(allDelegation[3][2].toString()))
-    console.log(tokensToEther(allDelegation[4][2].toString()))
-    console.log(tokensToEther(allDelegation[5][2].toString()))
+    console.log("0) "+tokensToEther(allDelegation[0][2].toString()))
+    console.log("1) "+tokensToEther(allDelegation[1][2].toString()))
+    console.log("2) "+tokensToEther(allDelegation[2][2].toString()))
+    console.log("3) "+tokensToEther(allDelegation[3][2].toString()))
+    console.log("4) "+tokensToEther(allDelegation[4][2].toString()))
+    console.log("5) "+tokensToEther(allDelegation[5][2].toString()))
   }
   
   main()

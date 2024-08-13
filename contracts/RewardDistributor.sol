@@ -72,7 +72,16 @@ contract RewardDistributor is Initializable, UUPSUpgradeable, IRewardDistributor
         emit TokensPerIntervalChange(_amount);
     }
 
+
+
     /**************************************** Only Owner Functions ****************************************/
+
+    /**
+     * @dev Need to make sure all rewardTracker contracts fully migrate rewardToken to new rewardToken after update this contract rewardToken address
+     */
+    function updateRewardToken(address _rewardToken) external onlyRole(OWNER_ROLE) {
+        rewardToken = _rewardToken;
+    }
 
     function recoverToken(
         address token,

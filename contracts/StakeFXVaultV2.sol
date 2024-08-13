@@ -15,7 +15,7 @@ import {IWFX} from "./interfaces/IWFX.sol";
 import {BaseVault} from "./vaults/BaseVault.sol";
 import {PrecompileStaking} from "./imp/PrecompileStaking.sol";
 
-contract StakeFXVault is
+contract StakeFXVaultV2 is
     Initializable,
     UUPSUpgradeable,
     PrecompileStaking,
@@ -27,7 +27,7 @@ contract StakeFXVault is
 
     uint256 internal constant BIPS_DIVISOR = 10000;
     uint256 internal constant PRECISION = 1e30;
-    address constant WFX = 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
+    // address constant WFX = 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
 
     uint256 public pendingFxReward;             // FX delegation rewards inside the contract pending for compound
     uint256 public feeOnReward;                 // Compound reward protocol fee
@@ -47,10 +47,12 @@ contract StakeFXVault is
     mapping(address => UserInfo) public userInfo;   // User info
     mapping(string => bool) public addedValidator;  // True if validator is added
 
+    address constant WFX = 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
+
     struct VaultInfo {
         uint256 stakeId;
         uint256 unstakeId;
-        uint256 length;        
+        uint256 length;
         uint256 totalAllocPoint;
         uint256 cumulativeRewardPerToken;
     }
@@ -75,6 +77,7 @@ contract StakeFXVault is
     event VestedFXChanged(address newAddress);
     event FeeTreasuryChanged(address newAddress);
     event DistributorChanged(address newAddress);
+    event ValidatorRedelegated(string srcVal, string dstVal, uint256 sharesAmount, uint256 redelegatedShares);
 
     receive() external payable {}
 
@@ -92,14 +95,14 @@ contract StakeFXVault is
     /**
      * @notice user stake FX to this contract
      */
-    function stake() external payable whenNotPaused {
+    function stake() external payable nonReentrant whenNotPaused {
         require(msg.value > 0, "Stake: 0 amount");
         uint256 totalAsset = totalAssets();
         require(msg.value + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
 
         uint256 delegationReward = getTotalDelegationRewards();
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
-            compound();
+            _compound();
         }
         _claim(msg.sender, msg.sender);
 
@@ -114,14 +117,14 @@ contract StakeFXVault is
     /**
      * @notice user stake WFX to this contract
      */
-    function stakeWFX(uint256 amount) external whenNotPaused {
+    function stakeWFX(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "Stake: 0 amount");
         uint256 totalAsset = totalAssets();
         require(amount + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
 
         uint256 delegationReward = getTotalDelegationRewards();
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
-            compound();
+            _compound();
         }
         _claim(msg.sender, msg.sender);
 
@@ -145,6 +148,11 @@ contract StakeFXVault is
         uint256 sharesBalance = balanceOf(msg.sender);
         require(sharesBalance >= amount, "Amount > stake");
 
+        // Add compound if contract size allow
+        uint256 delegationReward = getTotalDelegationRewards();
+        if(delegationReward >= MIN_COMPOUND_AMOUNT) {
+            _compound();
+        }
         _claim(msg.sender, msg.sender);
 
         uint256 undelegateAmount = previewRedeem(amount);
@@ -163,7 +171,7 @@ contract StakeFXVault is
      * @param val validator address
      * @param amount Amount of user's delegate shares transferred to this contract
      */
-    function entrustDelegatedShare(string memory val, uint256 amount) external whenNotPaused {
+    function entrustDelegatedShare(string memory val, uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "Entrust: 0 share");
 
         (uint256 sharesAmount, uint256 delegationAmount) = _delegation(val, msg.sender);
@@ -171,7 +179,7 @@ contract StakeFXVault is
 
         uint256 delegationReward = getTotalDelegationRewards();
         if(delegationReward >= MIN_COMPOUND_AMOUNT) {
-            compound();
+            _compound();
         }
         _claim(msg.sender, msg.sender);
         
@@ -180,9 +188,9 @@ contract StakeFXVault is
         require(estimateDelegateAmount + totalAsset <= CAP_STAKE_FX_TARGET, "Stake: > Cap");
 
         uint256 supply = totalSupply();
-        (uint256 fxAmountToTransfer, uint256 returnRewards) = _transferFromShares(val, msg.sender, address(this), amount);
+        (uint256 fxAmountToTransfer, uint256 returnReward) = _transferFromShares(val, msg.sender, address(this), amount);
 
-        pendingFxReward += returnRewards;
+        pendingFxReward += returnReward;
 
         uint256 shares = (fxAmountToTransfer == 0 || supply == 0)
                 ? _initialConvertToShares(fxAmountToTransfer, MathUpgradeable.Rounding.Down)
@@ -200,23 +208,8 @@ contract StakeFXVault is
     /**
      * @notice compound delegation rewards
      */
-    function compound() public nonReentrant whenNotPaused {
-        uint256 delegateReward = _withdrawReward() + pendingFxReward;
-        pendingFxReward = 0;
-
-        uint256 feeProtocol = (delegateReward * feeOnReward) / BIPS_DIVISOR;
-        uint256 feeCompounder = (delegateReward * feeOnCompounder) / BIPS_DIVISOR;
-
-        delegateReward = delegateReward - feeProtocol - feeCompounder;
-        _stake(delegateReward);
-
-        address treasury = payable(feeTreasury);
-        address user = payable(msg.sender);
-        (bool successTreasury, ) = treasury.call{value: feeProtocol}("");
-        (bool successUser, ) = user.call{value: feeCompounder}("");
-        require(successTreasury && successUser, "Failed to send FX");
-
-        emit Compound(msg.sender, delegateReward);
+    function compound() external nonReentrant whenNotPaused {
+        _compound();
     }
 
     function sendVestedFX(
@@ -250,84 +243,41 @@ contract StakeFXVault is
             index = 0;
         }
 
-        if (amount <= STAKE_FX_TARGET) {
-            uint256 numValidators = _calculateNumberofValidators(amount);
-            uint256 amountPerValidator = amount / numValidators;
-            uint256 remainingAmount = amount;
-            uint256 delegateAmount;
-            
-            while (remainingAmount != 0) {
-                ValInfo memory val = valInfo[index];
-                uint256 allocPoint = val.allocPoint;
-                index = (index + 1) % vaultLength;
+        uint256 numValidators = _calculateNumberofValidators(amount);
+        uint256 amountPerValidator = amount / numValidators;
+        uint256 remainingAmount = amount;
+        uint256 delegateAmount;
+        
+        while (remainingAmount != 0) {
+            ValInfo memory val = valInfo[index];
+            uint256 allocPoint = val.allocPoint;
+            index = (index + 1) % vaultLength;
 
-                if (allocPoint == 0) {
-                    continue;
-                }
-                
-                if (_totalAssets >= CAP_STAKE_FX_TARGET) {
-                    delegateAmount = remainingAmount;
-                } else {
-                    (, uint256 delegationAmount) = _delegation(val.validator, address(this));
-                    uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
-
-                    if (delegationAmount >= maxValSize) {
-                        continue;
-                    }
-
-                    if (remainingAmount <= amountPerValidator) {
-                        delegateAmount = remainingAmount;
-                    } else {
-                        delegateAmount = amountPerValidator;
-                    }
-                }
-
-                (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
-                _totalAssets += delegateAmount;
-                totalReturnReward += returnReward;
-                remainingAmount -= delegateAmount;
+            if (allocPoint == 0) {
+                continue;
             }
-        } else {
-            uint256 remainingAmount = amount;
-            uint256 delegateAmount;
             
-            while (remainingAmount != 0) {
-                ValInfo memory val = valInfo[index];
-                uint256 allocPoint = val.allocPoint;
-                
-                index = (index + 1) % vaultLength;
+            if (_totalAssets >= CAP_STAKE_FX_TARGET) {
+                delegateAmount = remainingAmount;
+            } else {
+                (, uint256 delegationAmount) = _delegation(val.validator, address(this));
+                uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
 
-                // Skip validators that has 0 allocPoint
-                if (allocPoint == 0) {
+                if (delegationAmount >= maxValSize) {
                     continue;
                 }
 
-                if (_totalAssets >= CAP_STAKE_FX_TARGET) {
+                if (remainingAmount <= amountPerValidator) {
                     delegateAmount = remainingAmount;
                 } else {
-                    (, uint256 delegationAmount) = _delegation(val.validator, address(this));
-                    uint256 maxValSize = allocPoint * CAP_STAKE_FX_TARGET / totalAllocPoint;
-                    
-                    // Skip validators that has reach max of its allocation FX delegation
-                    if (delegationAmount >= maxValSize) {
-                        continue;
-                    }
-
-                    // If remainingAmount more than allocDelegateAmount, only delegate allocDelegateAmount
-                    uint256 allocDelegateAmount = amount * allocPoint / totalAllocPoint;
-
-                    if (remainingAmount <= allocDelegateAmount) {
-                        delegateAmount = remainingAmount;
-                    } else {
-                        delegateAmount = allocDelegateAmount;
-                    }
+                    delegateAmount = amountPerValidator;
                 }
-                
-                (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
-                _totalAssets += delegateAmount;
-                totalReturnReward += returnReward;
-                remainingAmount -= delegateAmount;
             }
+
+            (, uint256 returnReward) = _delegate(val.validator, delegateAmount);
+            _totalAssets += delegateAmount;
+            totalReturnReward += returnReward;
+            remainingAmount -= delegateAmount;
         }
 
         vaultInfo.stakeId = index;
@@ -353,7 +303,7 @@ contract StakeFXVault is
         if (index >= vaultLength) {
             index = 0;
         }   
-
+        // If contract byte size exceed limit, divide to half part can be removed
         if (amount >= UNSTAKE_FX_TARGET) {
             uint256 halfOfUndelegateAmount = amount / 2; 
             (returnUndelegatedAmount, returnReward, endTime) = _toUndelegate(index, halfOfUndelegateAmount);
@@ -410,6 +360,28 @@ contract StakeFXVault is
     }
 
     /**
+    * @dev Helper function to compound FX amount from validators.
+    */
+    function _compound() internal {
+        uint256 delegateReward = _withdrawReward() + pendingFxReward;
+        pendingFxReward = 0;
+
+        uint256 feeProtocol = (delegateReward * feeOnReward) / BIPS_DIVISOR;
+        uint256 feeCompounder = (delegateReward * feeOnCompounder) / BIPS_DIVISOR;
+
+        delegateReward = delegateReward - feeProtocol - feeCompounder;
+        _stake(delegateReward);
+
+        address treasury = payable(feeTreasury);
+        address user = payable(msg.sender);
+        (bool successTreasury, ) = treasury.call{value: feeProtocol}("");
+        (bool successUser, ) = user.call{value: feeCompounder}("");
+        require(successTreasury && successUser, "Failed to send FX");
+
+        emit Compound(msg.sender, delegateReward);
+    }
+
+    /**
     * @dev Helper function to withdraw delegation fx rewards from all validators.
     */
     function _withdrawReward() internal returns (uint256) {
@@ -431,7 +403,7 @@ contract StakeFXVault is
     }
 
     /**
-    * @dev Helper function to help to calculate number of validator to delegate based on input amount.
+    * @dev Helper function to help to calculate number of validator to delegate based on Log10 input amount.
     * @param delegateAmount Fx Amount to stake.
     * @return Number of validators to delegate.
     */
@@ -539,16 +511,6 @@ contract StakeFXVault is
     }
 
     /**
-     * @notice Return delegation share and fx amount
-     */
-    function getDelegationInfo(
-        uint256 index
-    ) external view returns (uint256, uint256) {
-        (uint256 sharesAmount, uint256 delegationAmount) = _delegation(valInfo[index].validator, address(this));
-        return (sharesAmount, delegationAmount);
-    }
-
-    /**
      * @notice Return validator address and allocPoint
      */
     function getValInfo(uint256 index) public view returns (uint256, string memory) {
@@ -615,10 +577,11 @@ contract StakeFXVault is
         VaultInfo memory vault = vaultInfo;
         uint256 vaultLength = vault.length;
 
-        for (uint256 i = 0; i < vaultLength; i++) {
+        for (uint256 i = 0; i < vaultLength;) {
             if (valInfo[i].allocPoint == 0) {
                 string memory val = valInfo[i].validator;
                 (uint256 sharesAmount, ) = _delegation(val, address(this));
+
                 if (sharesAmount == 0) {
                     addedValidator[val] = false;
                     uint256 lastIndex = vaultLength - 1;
@@ -627,11 +590,41 @@ contract StakeFXVault is
 
                     emit ValidatorRemoved(val);
                     vaultLength--;
-                    i--;
+                    // Skip if i == 0 to prevent underflow
+                    if (i == 0) {
+                        continue;
+                    } else {
+                        --i;
+                    }                    
                 }
             }
+            unchecked {
+                ++i;
+            }
         }
+
         vaultInfo.length = vaultLength;
+    }
+
+    function redelegateValidator(
+        uint256 srcId,
+        uint256 dstId,
+        uint256 redelegateAmount
+    ) external onlyRole(GOVERNOR_ROLE) {
+        require(srcId < vaultInfo.length && dstId < vaultInfo.length, "Invalid ID");
+        ValInfo memory srcVal = valInfo[srcId];
+        ValInfo memory dstVal = valInfo[dstId];
+        (uint256 sharesAmount,) = _delegation(srcVal.validator, address(this));
+
+        uint256 returnReward;
+        uint256 redelegatedShares;        
+
+        require(redelegateAmount <= sharesAmount, "!Amount");
+        (redelegatedShares, returnReward, ) = _redelegate(srcVal.validator, dstVal.validator, redelegateAmount);
+
+        pendingFxReward += returnReward;
+
+        emit ValidatorRedelegated(srcVal.validator, dstVal.validator, sharesAmount, redelegatedShares);
     }
 
     function updateValidator(
@@ -654,6 +647,10 @@ contract StakeFXVault is
         STAKE_FX_TARGET = newStakeFxTarget;
     }
 
+    /**
+     * @notice Update compounding fee percentage for protocol and compounder and user withdrawal percentage
+     * newFeeOnReward + newFeeOnCompounder) <= BIPS_DIVISOR && newFeeOnWithdrawal <= BIPS_DIVISOR
+     */
     function updateFees(uint256 newFeeOnReward, uint256 newFeeOnCompounder, uint256 newFeeOnWithdrawal) external onlyRole(GOVERNOR_ROLE) {
         feeOnReward = newFeeOnReward;
         feeOnCompounder = newFeeOnCompounder;
@@ -683,16 +680,13 @@ contract StakeFXVault is
         address _recipient
     ) external onlyRole(OWNER_ROLE) {
         require(_recipient != address(0), "Send to zero address");
-        IERC20Upgradeable(token).safeTransfer(_recipient, amount);
-    }
-
-    function recoverFx(
-        uint256 safeAmount,
-        address _recipient
-    ) external onlyRole(OWNER_ROLE) {
-        address recipient = payable(_recipient);
-        (bool success, ) = recipient.call{value: safeAmount}("");
-        require(success, "Failed to send FX");
+        if(token != address(0)) {
+            IERC20Upgradeable(token).safeTransfer(_recipient, amount);
+        } else {
+            address recipient = payable(_recipient);
+            (bool success, ) = recipient.call{value: amount}("");
+            require(success, "Failed to send FX");
+        }
     }
 
     /**************************************************************
@@ -711,7 +705,7 @@ contract StakeFXVault is
             _owner,
             _governor
         );
-        __Governable_init(_owner, _governor);
+        // __Governable_init(_owner, _governor);    redundant code
         __UUPSUpgradeable_init();
     }
 }

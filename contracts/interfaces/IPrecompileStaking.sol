@@ -21,4 +21,19 @@ interface IPrecompileStaking {
 
     function delegationRewards(string memory _val, address _del) external view returns (uint256);
 
+    function delegateV2(
+        string memory _val,
+        uint256 _amount
+    ) external payable returns (bool _result);
+
+    function undelegateV2(
+        string memory _val,
+        uint256 _amount
+    ) external returns (bool _result);
+
+    function redelegateV2(
+        string memory _valSrc,
+        string memory _valDst,
+        uint256 _amount
+    ) external returns (bool _result);
 }

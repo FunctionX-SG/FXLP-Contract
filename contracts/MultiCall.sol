@@ -28,6 +28,12 @@ contract MultiCall is
         uint256 delegationReward;
     }
 
+    struct ValidatorUserDelegationInfo {
+        string validator;
+        uint256 delegationAmount;
+        uint256 allowanceShares;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -52,6 +58,27 @@ contract MultiCall is
                 allocPoint: valAllocPoint,
                 delegationAmount: delegationAmount,
                 delegationReward: delegationReward
+            });
+        }
+    }
+
+    /**
+    * @dev Get All Validator User Delegation
+    */
+    function getAllValidatorUserDelegation(address user) external view returns (ValidatorUserDelegationInfo[] memory validatorUserDelegations) {
+        uint256 validatorsLength = IStakeFXVault(stFX).getValLength();
+
+        validatorUserDelegations = new ValidatorUserDelegationInfo[](validatorsLength);
+        for (uint256 i = 0; i < validatorsLength; i++) {
+            (, string memory validatorAddress) = IStakeFXVault(stFX).getValInfo(i);
+            
+            (, uint256 delegationAmount) = _delegation(validatorAddress, user);
+            uint256 allowanceShares = _allowanceShares(validatorAddress, user, stFX);
+
+            validatorUserDelegations[i] = ValidatorUserDelegationInfo({
+                validator: validatorAddress,
+                delegationAmount: delegationAmount,
+                allowanceShares: allowanceShares
             });
         }
     }
