@@ -27,7 +27,7 @@ contract StakeFXVaultV3 is
 
     uint256 internal constant BIPS_DIVISOR = 10000;
     uint256 internal constant PRECISION = 1e30;
-    // address constant WFX = 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
+    address constant WFX = 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
 
     uint256 public pendingFxReward;             // FX delegation rewards inside the contract pending for compound
     uint256 public feeOnReward;                 // Compound reward protocol fee
@@ -46,8 +46,6 @@ contract StakeFXVaultV3 is
     mapping(uint256 => ValInfo) public valInfo;     // Validator info
     mapping(address => UserInfo) public userInfo;   // User info
     mapping(string => bool) public addedValidator;  // True if validator is added
-
-    address constant WFX = 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19;  // WFX mainnet: 0x80b5a32E4F032B2a058b4F29EC95EEfEEB87aDcd; WFX testnet: 0x3452e23F9c4cC62c70B7ADAd699B264AF3549C19
 
     struct VaultInfo {
         uint256 stakeId;

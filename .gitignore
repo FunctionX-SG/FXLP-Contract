@@ -9,3 +9,6 @@ coverage
 coverage.json
 typechain
 typechain-types
+out
+slither.db.json
+slitherCheck.txt
