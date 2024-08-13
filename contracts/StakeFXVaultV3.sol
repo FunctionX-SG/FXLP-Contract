@@ -306,7 +306,8 @@ contract StakeFXVaultV3 is
                 amountToUndelegate = delegationAmount;
             }
 
-            _undelegateV2(valInfo[index].validator, amountToUndelegate);
+            bool result = _undelegateV2(valInfo[index].validator, amountToUndelegate);
+            require(result == true, "delegate fail");
         }
 
         return amountToUndelegate;
@@ -521,7 +522,8 @@ contract StakeFXVaultV3 is
         require(redelegateAmount <= delegationAmount, "!Amount");
 
         _compound();
-        _redelegateV2(srcVal.validator, dstVal.validator, redelegateAmount);
+        bool result = _redelegateV2(srcVal.validator, dstVal.validator, redelegateAmount);
+        require(result == true, "delegate fail");
 
         emit ValidatorRedelegated(srcVal.validator, dstVal.validator, redelegateAmount, redelegateAmount);
     }
